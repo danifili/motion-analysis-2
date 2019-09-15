@@ -1,49 +1,10 @@
-import csv
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-class BezierCurve:
-  def __init__(self, start, end, control):
-    self.start = np.array(start)
-    self.end = np.array(end)
-    self.control = np.array(control)
-  
-  def split_points(self, delta=1):
-    length = self.estimate_length()
-    num_steps = int(self.estimate_length() / delta)
-    return np.array([self.get_point(self.find_t(length * step/num_steps)) for step in range(num_steps)])
-  
-  def estimate_length(self, num_steps=100, start_t=0, end_t=1):
-    points = [self.get_point(start_t + (end_t - start_t)*step/num_steps) for step in range(num_steps+1)]
-    distance = 0
-    for idx in range(len(points)-1):
-      distance += np.linalg.norm(points[idx] - points[idx+1])
-    return distance
-    
-  def get_point(self, t):
-    return (1-t)**2 * self.start + 2*(1-t)*t*self.control + t**2* self.end
-  
-  def find_t(self, sub_length, start_t=0, end_t=1, eps = 1e-6):
-    mid_t = (start_t + end_t) / 2
-    length_to_mid_t = self.estimate_length(start_t=start_t, end_t=mid_t)
-    offset = sub_length - length_to_mid_t
-    if np.abs(offset) < eps:
-      return mid_t
-    elif offset < 0:
-      return self.find_t(sub_length, start_t=start_t, end_t=mid_t, eps=eps)
-    else:
-      return self.find_t(sub_length-length_to_mid_t, start_t=mid_t, end_t=end_t, eps=eps)
-      
-
-def read_csv_file(filename):
-  with open(filename, 'r') as f:
-    reader = csv.reader(f)
-    array = []
-    for row in reader:
-      array.append(list(map(float,row)))
-    return np.array(array)
+from src.post_processing.motion_across_curve.bezier_curve import BezierCurve
+from src.utils.file_reader import read_csv_file
 
 def get_new_amp_and_phase(long_vec, amp_vec, phase_vec):
   theta = np.arctan2(long_vec[1], long_vec[0])
@@ -83,9 +44,9 @@ if __name__ == "__main__":
   width, height = ampX.shape
 
   bezier_curve = BezierCurve(
-    start = start_point * np.array([width/100, height/100]),
-    control = control_point * np.array([width/100, height/100]),
-    end = end_point * np.array([width/100, height/100])
+    start_point = start_point * np.array([width/100, height/100]),
+    control_point = control_point * np.array([width/100, height/100]),
+    end_point = end_point * np.array([width/100, height/100])
   )
 
   points = bezier_curve.split_points(delta=1)

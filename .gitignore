@@ -4,3 +4,5 @@ backend/static
 backend/templates
 frontend/scripts
 frontend/node_modules
+.env
+*__pycache__*
