@@ -49,7 +49,7 @@ if __name__ == "__main__":
     end_point = end_point * np.array([width/100, height/100])
   )
 
-  points = bezier_curve.split_points(delta=1)
+  points = bezier_curve.split_curve_equally(curve_segment_length=1)
 
   print("divided bezier curve")
 
