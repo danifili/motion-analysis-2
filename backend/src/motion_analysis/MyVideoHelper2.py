@@ -19,6 +19,7 @@ def optimized_conv(A, kernel, last_kernel):
     for i in range(1, 8):
         ans += cv2.filter2D(A[i], -1, cv2.flip(kernel, flipCode=-1)) * last_kernel[7-i]
     return ans[2:-2, 2:-2]
+
 class MyVideoHelper2(object):
     
     def __init__(self, images):
