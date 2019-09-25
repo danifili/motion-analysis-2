@@ -41,7 +41,7 @@ def generate_data(args):
 
     quality_level = args["q"]
 
-    max_iterations = 100 if args["--hornShunck"] else 0
+    max_iterations = 100 if args["hornShunck"] else 0
 
     cumulative_displacements = video.get_cumulative_displacements(min_corner, max_corner, quality_level=quality_level, max_iterations=max_iterations)
     data = sinusoidal_fit(cumulative_displacements)
@@ -292,7 +292,7 @@ if __name__ == "__main__":
              {"-p": dict(action="store_false", help=HELP["-p"])},
              {"-x": dict(action="store_true", help=HELP["-x"])},
              {"-w": dict(action="store", help=HELP["-w"], nargs=6, metavar=("frequency", "pixel_dimensions", "x_min", "y_min", "x_max", "y_max"), type=float)},
-             {"--hornShunck": dict(action="store_false", help=HELP["--hornShunck"])},
+             {"--hornShunck": dict(action="store_true", help=HELP["--hornShunck"])},
              {"--motionmag": dict(action="store", help=HELP["--motionmag"], type=float, metavar="factor")},
              {"--motionstop": dict(action="store_true", help=HELP["--motionstop"])}]
 
