@@ -5,11 +5,106 @@ Created on Thu Jun 15 12:31:12 2017
 
 @author: danifili
 """
-from MyVideoHelper2 import MyVideoHelper2
-from MyVideoOpticalFlow import HornShunck
-from TimonerFreeman import TimonerFreeman
-
+from src.motion_analysis.MyVideoHelper2 import MyVideoHelper2
+from src.motion_analysis.MyVideoOpticalFlow import HornShunck
+from src.motion_analysis.TimonerFreeman import TimonerFreeman
+from multiprocessing import Pool, Process
+import time
+from tqdm import tqdm
+from numba import njit
 import numpy as np
+from tqdm import tqdm
+
+@njit
+def sinusoidal_fit(cumulative_displacements):
+    """
+    Given a region of interest that have sinusoidal movement with an expected frequency, it calculates the
+    amplitude and phase for every pixel
+    
+    params:
+        -min_corner: A tuple of size 2 representing the (x, y) coordinates
+            of the upper-left corner of our region of interest.
+            It must satisfy:
+            * 0 <= min_corner[0] < self.width
+            * 0 <= min_corner[1] < self.height
+            
+        -max_corner: A tuple of size 2 representing the (x, y) coordinates 
+        of the lower-right corner of our region of interest.
+        It must satisfy:
+            * min_corner[0] < max_corner[0] < self.width
+            * min_corner[1] < max_corner[1] < self.height
+        
+        -win_min: The minimum size of the regions used to calculate the initial displacements of this algorithm
+        
+        -win_max: The maximum size of the regions used to calculate the initial displacements of this algorithm
+        
+        -max_iterations: maximum number of iterations that the algorithm can perform
+        
+        -smoothness: positive flow used to control the smoothness of the optical flow. The closer to 0 the smoother
+        
+        -min_eigen: a positive float; the min acceptable ratio between the eigenvalues and the area
+        of the region of interest of the matrix used to compute its displacement.
+        
+    returns: 
+        a numpy array of size W x H x 4, where W and H are the width and height of the region of interest, in which
+        the (x, y) entry is a numpy array of size 4 containing amplitude_x, amplitude_y, phase_x, phase_y
+    """
+    period = 8
+    frequency = 2 * np.pi / period
+    t = np.array([frequency * p for p in range(period)])
+    sin_t = np.sin(t)
+    cos_t = np.cos(t)
+    cos_t_minus_1 = cos_t - 1
+    M = np.array([list(sin_t), list(cos_t_minus_1)])
+    P = np.dot(np.linalg.inv(np.dot(M, M.T)), M)
+
+    width = cumulative_displacements.shape[1]
+    height = cumulative_displacements.shape[2]
+
+    data = np.zeros((width, height, 4), dtype=np.float64)
+    single_cumulative_displacements_x = np.zeros(8, dtype=np.float64)
+    single_cumulative_displacements_y = np.zeros(8, dtype=np.float64)
+
+    for x in range(width):
+        for y in range(height):
+            for f in range(period):
+                single_cumulative_displacements_x[f] = cumulative_displacements[f, x, y, 0]
+                single_cumulative_displacements_y[f] = cumulative_displacements[f, x, y, 1]
+            amp_x, phase_x = sinusoidal_fit_helper(single_cumulative_displacements_x, P)
+            amp_y, phase_y = sinusoidal_fit_helper(single_cumulative_displacements_y, P)
+
+            data[x, y, 0] = amp_x
+            data[x, y, 1] = amp_y
+            data[x, y, 2] = phase_x
+            data[x, y, 3] = phase_y
+
+    return data
+
+@njit
+def sinusoidal_fit_helper(cumulative_displacements, P):
+    """
+    Given the displacements in a certain direction for a pixel that have sinusoidal movement with a given frequency,
+    it calculates the amplitude and phase of the sine wave
+    
+    params:
+        -displacements: a numpy array containing the displacements in a certain direction of two consecutive images
+        
+    returns:
+        a tuple in which the first entry is the amplitude of the sine wave and the second entry is the phase of
+        the sine wave
+    """
+
+    projection = P.dot(cumulative_displacements)
+    A = projection[0]
+    B = projection[1]
+
+    amp = np.sqrt(A * A + B * B)
+    phase = np.arctan2(B, A)
+
+    if phase < 0:
+        phase += 2 * np.pi
+
+    return amp, phase % (2 * np.pi)
 
 class MyVideo(MyVideoHelper2):
     
@@ -26,8 +121,7 @@ class MyVideo(MyVideoHelper2):
         self.__Et = np.zeros(image_shape)
 
         print ("Computing gradients...")
-        
-        for t in range(self.duration-1):
+        for t in tqdm(range(self.duration-1)):
             self.__Ex[:, :, t] = self._Ex(min_corner, max_corner, t)
             self.__Ey[:, :, t] = self._Ey(min_corner, max_corner, t)
             self.__Et[:, :, t] = self._Et(min_corner, max_corner, t)
@@ -84,11 +178,10 @@ class MyVideo(MyVideoHelper2):
         new_max_corner = (x_max + margin, y_max + margin)
         
         #get the minimum eigenvalue of the region of interest to determine if there is enough contrast
-        l1, l2 = self.__video_displacement_ROI.get_eigenvalues(new_min_corner,new_max_corner, t)
         new_area = (2*margin + roi_width) * (2*margin + roi_height)
-        
-        return self.__video_displacement_ROI.get_displacement_ROI(new_min_corner, new_max_corner, t), l1 / new_area, l2 /new_area 
-        
+        displacements, (l1, l2) = self.__video_displacement_ROI.get_displacement_ROI(new_min_corner, new_max_corner, t)
+        return displacements, l1 / new_area, l2 /new_area 
+
           
     def get_optical_flow_ROI(self, min_corner, max_corner, t, win_min = 5, win_max = 25, quality_level = 0.07, max_iterations = 100,  smoothness = 100):
         """
@@ -144,7 +237,7 @@ class MyVideo(MyVideoHelper2):
         displacements = []
         mask = np.zeros((roi_width, roi_height, 2))
 
-        for x in range(roi_width // win_min):
+        for x in tqdm(range(roi_width // win_min)):
             for y in range(roi_height // win_min):
                 new_min_corner = np.array([win_min * x + x_min, win_min * y + y_min])
                 new_max_corner = np.array([win_min * (x+1) + x_min-1, win_min*(y+1)+y_min-1])
@@ -199,93 +292,7 @@ class MyVideo(MyVideoHelper2):
 
         return cumulative_displacements
 
-    def sinusoidal_fit(self, cumulative_displacements):
-        """
-        Given a region of interest that have sinusoidal movement with an expected frequency, it calculates the
-        amplitude and phase for every pixel
-        
-        params:
-            -min_corner: A tuple of size 2 representing the (x, y) coordinates
-             of the upper-left corner of our region of interest.
-             It must satisfy:
-                * 0 <= min_corner[0] < self.width
-                * 0 <= min_corner[1] < self.height
-                
-            -max_corner: A tuple of size 2 representing the (x, y) coordinates 
-            of the lower-right corner of our region of interest.
-            It must satisfy:
-                * min_corner[0] < max_corner[0] < self.width
-                * min_corner[1] < max_corner[1] < self.height
-            
-            -win_min: The minimum size of the regions used to calculate the initial displacements of this algorithm
-            
-            -win_max: The maximum size of the regions used to calculate the initial displacements of this algorithm
-            
-            -max_iterations: maximum number of iterations that the algorithm can perform
-            
-            -smoothness: positive flow used to control the smoothness of the optical flow. The closer to 0 the smoother
-            
-            -min_eigen: a positive float; the min acceptable ratio between the eigenvalues and the area
-            of the region of interest of the matrix used to compute its displacement.
-            
-        returns: 
-            a numpy array of size W x H x 4, where W and H are the width and height of the region of interest, in which
-            the (x, y) entry is a numpy array of size 4 containing amplitude_x, amplitude_y, phase_x, phase_y
-        """
-        period = 8
-        frequency = 2 * np.pi / period
-        t = np.array([frequency * p for p in range(period)])
-        sin_t = np.sin(t)
-        cos_t = np.cos(t)
-        cos_t_minus_1 = cos_t - 1
-        M = np.array([sin_t, cos_t_minus_1])
-        P = np.dot(np.linalg.inv(np.dot(M, M.T)), M)
-        P = np.array(P, dtype=np.float64)
-
-        width = cumulative_displacements.shape[1]
-        height = cumulative_displacements.shape[2]
-
-        data = np.zeros((width, height, 4), dtype=np.float64)
-        single_cumulative_displacements_x = np.zeros(8, dtype=np.float64)
-        single_cumulative_displacements_y = np.zeros(8, dtype=np.float64)
-
-        for x in range(width):
-            for y in range(height):
-                for f in range(period):
-                    single_cumulative_displacements_x[f] = cumulative_displacements[f, x, y, 0]
-                    single_cumulative_displacements_y[f] = cumulative_displacements[f, x, y, 1]
-                amp_x, phase_x = self._sinusoidal_fit_helper(single_cumulative_displacements_x, P)
-                amp_y, phase_y = self._sinusoidal_fit_helper(single_cumulative_displacements_y, P)
-
-                data[x, y, 0] = amp_x
-                data[x, y, 1] = amp_y
-                data[x, y, 2] = phase_x
-                data[x, y, 3] = phase_y
-
-        return data
-
-
-    def _sinusoidal_fit_helper(self, cumulative_displacements, P):
-        """
-        Given the displacements in a certain direction for a pixel that have sinusoidal movement with a given frequency,
-        it calculates the amplitude and phase of the sine wave
-        
-        params:
-            -displacements: a numpy array containing the displacements in a certain direction of two consecutive images
-            
-        returns:
-            a tuple in which the first entry is the amplitude of the sine wave and the second entry is the phase of
-            the sine wave
-        """
-
-        projection = P.dot(cumulative_displacements)
-        A = projection[0]
-        B = projection[1]
-
-        amp = np.sqrt(A * A + B * B)
-        phase = np.arctan2(B, A)
-
-        if phase < 0:
-            phase += 2 * np.pi
-
-        return amp, phase % (2 * np.pi)
+if __name__ == "__main__":
+    for i in tqdm(range(10)):
+        sinusoidal_fit(np.random.rand(8, 2500, 2500, 2))
+    

@@ -7,7 +7,7 @@ Created on Fri Jul  7 11:25:52 2017
 """
 import numpy as np
 from scipy import signal
-from MyVideoHelper2 import MyVideoHelper2
+from src.motion_analysis.MyVideoHelper2 import MyVideoHelper2
 from abc import ABC, abstractmethod
 
 

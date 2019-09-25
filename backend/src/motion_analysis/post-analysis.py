@@ -2,8 +2,8 @@ import argparse
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
-from Plot import Plot
-from MyImage import MyImage
+from src.motion_analysis.Plot import Plot
+from src.motion_analysis.MyImage import MyImage
 
 
 def generate_data(args):

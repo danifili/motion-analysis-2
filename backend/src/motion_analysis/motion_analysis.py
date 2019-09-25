@@ -7,9 +7,9 @@ Created on Wed Aug  9 12:04:33 2017
 """
 
 import sys
-from MyVideoFinal import MyVideo
-from MyImage import MyImage
-from Plot import Plot
+from src.motion_analysis.MyVideoFinal import MyVideo, sinusoidal_fit
+from src.motion_analysis.MyImage import MyImage
+from src.motion_analysis.Plot import Plot
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -42,7 +42,7 @@ def generate_data(args):
     quality_level = args["q"]
 
     cumulative_displacements = video.get_cumulative_displacements(min_corner, max_corner, quality_level=quality_level)
-    data = video.sinusoidal_fit(cumulative_displacements)
+    data = sinusoidal_fit(cumulative_displacements)
     
     args["data"] = data
     args["cumulative_displacements"] = cumulative_displacements

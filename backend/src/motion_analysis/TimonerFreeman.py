@@ -1,9 +1,22 @@
-from MyVideoHelper2 import MyVideoHelper2
+from src.motion_analysis.MyVideoHelper2 import MyVideoHelper2
 import numpy as np
 import functools
 from timeit import default_timer as timer
-
+from numba import njit, jit
 from scipy import ndimage
+from tqdm import tqdm
+
+@njit
+def optimized_solve(gx, gy, gt, correlation):
+    A = np.array([[np.dot(gx, gx), np.dot(gx, gy)],
+					 [np.dot(gx, gy), np.dot(gy, gy)]])
+
+    b = np.array([np.dot(gx, gt), np.dot(gy, gt)])
+    U, s, V = np.linalg.svd(A)
+    s_inv_diag = [1/x if x * correlation > np.max(s) else 0 for x in s]
+    s_inv = np.array([[s_inv_diag[0], 0], [0, s_inv_diag[1]]])
+    A_pseudoinverse = np.dot(np.transpose(V), np.dot(s_inv, np.transpose(U)))
+    return np.dot(A_pseudoinverse, b), s
 
 class TimonerFreeman(MyVideoHelper2):
     """
@@ -136,14 +149,9 @@ class TimonerFreeman(MyVideoHelper2):
         gx = self.__Ex[x_min:x_max+1, y_min:y_max+1, time].ravel()
         gy = self.__Ey[x_min:x_max+1, y_min:y_max+1, time].ravel()
         gt = self.__Et[x_min:x_max+1, y_min:y_max+1, time].ravel()
-        
-        A = np.array([[np.dot(gx, gx), np.dot(gx, gy)],
-					 [np.dot(gx, gy), np.dot(gy, gy)]])
 
-        b = np.array([np.dot(gx, gt), np.dot(gy, gt)])
-
-        
-        return -1 * self._solve(A, b, correlation)
+        solution, eigenvalues = optimized_solve(gx, gy, gt, correlation)
+        return -solution, eigenvalues
 
     
     def get_eigenvalues(self, min_corner, max_corner, time):
@@ -184,8 +192,7 @@ class TimonerFreeman(MyVideoHelper2):
 
         u, s, v = np.linalg.svd(A)
         return s
-
-
+    
     def _solve(self, A, b, correlation):
         """
         Find the solution of the equation Ax = b by using SVD
@@ -202,15 +209,20 @@ class TimonerFreeman(MyVideoHelper2):
             
         """
         try:
-            
-            U, s, V = np.linalg.svd(A, full_matrices = True)
-
-            s_inv = np.diag([1/x if x * correlation > max(s) else 0 for x in s])
-            A_pseudoinverse = np.dot(np.transpose(V), np.dot(s_inv, np.transpose(U)))
-            return np.dot(A_pseudoinverse, b)
+            return optimized_solve(A, b, correlation)
 
         except np.linalg.linalg.LinAlgError:
-            return np.zeros(A.shape[0])
+            return np.zeros(A.shape[0]), np.zeros(2)
 
+if __name__ == "__main__":
+    """
+    A = np.random.rand(2,2)
+    b = np.random.rand(2)
+    correlation = np.random.rand()
 
-
+    for i in tqdm(range(100000)):
+        optimized_solve(A, b, correlation)
+    """
+    gx, gy, gt = np.random.rand(25*25), np.random.rand(25*25), np.random.rand(25*25) 
+    for i in tqdm(range(1000000)):
+        optimized_solve(gx, gy, gt, 50)

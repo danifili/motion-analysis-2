@@ -9,7 +9,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.interpolate import griddata
+import time
+from numba import njit
+import cv2
 
+
+def optimized_conv(A, kernel, last_kernel):
+    ans = cv2.filter2D(A[0], -1, cv2.flip(kernel, flipCode=-1))* last_kernel[7]
+    for i in range(1, 8):
+        ans += cv2.filter2D(A[i], -1, cv2.flip(kernel, flipCode=-1)) * last_kernel[7-i]
+    return ans[2:-2, 2:-2]
 class MyVideoHelper2(object):
     
     def __init__(self, images):
@@ -98,7 +107,7 @@ class MyVideoHelper2(object):
         return self.__images[t][x,y]
     
         
-    def _partial_ROI_helper(self, min_corner, max_corner, t, offset, partial_derivative):
+    def _partial_ROI_helper(self, min_corner, max_corner, t, offset, kernel, last_kernel):
         """
         Given the coordinates of the corners of a specific region of interest, a particular time and a shift of the image,
         and a function representing a partial derivative, it returns a matrix containing this partials on the specified
@@ -136,19 +145,6 @@ class MyVideoHelper2(object):
         assert 0 <= x_min < x_max < self.width
         assert 0 <= y_min < y_max < self.height
         assert 0 <= t < self.duration - 1
-        
-        
-#        x_rel_A_min = x_min-sx-1
-#        x_rel_A_max = x_max+2-sx
-#        
-#        y_rel_A_min = y_min-sy-1
-#        y_rel_A_max = y_max+2-sy
-#        
-#        x_rel_B_min = x_min-1
-#        x_rel_B_max = x_max+2
-#        
-#        y_rel_B_min = y_min-1
-#        y_rel_B_max = y_max+2
 
         x_rel_min = x_min-2
         x_rel_max = x_max+3
@@ -159,12 +155,9 @@ class MyVideoHelper2(object):
         B = self.__images[(t+1)%8:]
         B.extend(self.__images[:(t+1)%8])
         B.reverse()
-        
         B = [a[x_rel_min: x_rel_max, y_rel_min: y_rel_max] for a in B]
-    
-        return partial_derivative(B)
+        return optimized_conv(B, kernel, last_kernel)
 
-    
     def _Ex(self, min_corner, max_corner, t, offset = (0, 0)):
         """
         Given the coordinates of the corners of a specific region of interest, a particular time and a shift of the image,
@@ -198,11 +191,9 @@ class MyVideoHelper2(object):
 #                           [0,0,0]]).T
     
         kernel = np.array([[self.__gxy[x] * self.__hxy[y] for y in range(7)] for x in range(7)])
-        
-        dBdx = lambda A: sum(signal.convolve2d(A[i], kernel, mode='same') * self.__ht[7-i] for i in range(8))[2:-2, 2:-2]
-    
-        return self._partial_ROI_helper(min_corner, max_corner, t, offset, dBdx)
-    
+
+        return self._partial_ROI_helper(min_corner, max_corner, t, offset, kernel, self.__ht)
+
     def _Ey(self, min_corner, max_corner, t, offset = (0,0)):
         """
         Given the coordinates of the corners of a specific region of interest, a particular time and a shift of the image,
@@ -238,10 +229,10 @@ class MyVideoHelper2(object):
         
         kernel = np.array([[self.__hxy[x] * self.__gxy[y] for y in range(7)] for x in range(7)])
     
-        dBdy = lambda A: sum(signal.convolve2d(A[i], kernel, mode='same') * self.__ht[7-i] for i in range(8))[2:-2, 2:-2]
+        #dBdy = lambda A: optimized_conv(A, kernel, self.__ht)
                              
-        return self._partial_ROI_helper(min_corner, max_corner, t, offset, dBdy)
-    
+        return self._partial_ROI_helper(min_corner, max_corner, t, offset, kernel, self.__ht)
+
     def _Et(self, min_corner, max_corner, t, offset = (0,0)):
         """
         Given the coordinates of the corners of a specific region of interest, a particular time and a shift of the image,
@@ -275,10 +266,8 @@ class MyVideoHelper2(object):
 #        kernel = kernel/2
 
         kernel = np.array([[self.__hxy[x] * self.__hxy[y] for y in range(7)] for x in range(7)])
-        
-        dBdt = lambda A: sum(signal.convolve2d(A[i], kernel, mode='same') * self.__gt[7-i] for i in range(8))[2:-2, 2:-2]
                             
-        return self._partial_ROI_helper(min_corner, max_corner, t, offset, dBdt)
+        return self._partial_ROI_helper(min_corner, max_corner, t, offset, kernel, self.__gt)
     
     def _get_average_displacements(self, displacements):
         """
@@ -305,9 +294,8 @@ class MyVideoHelper2(object):
 
     
         # Perform 2D convolution with input data and kernel 
-        u_avg = signal.convolve2d(u, kernel, boundary='symm', mode='same', fillvalue = 0)
-        v_avg = signal.convolve2d(v, kernel, boundary='symm', mode='same', fillvalue = 0)
-        
+        u_avg = cv2.filter2D(u, -1, cv2.flip(kernel, flipCode=-1))
+        v_avg = cv2.filter2D(v, -1, cv2.flip(kernel, flipCode=-1))
         averages = np.zeros((width, height, 2))
         averages[:, :, 0] = u_avg
         averages[:, :, 1] = v_avg

@@ -7,8 +7,9 @@ Created on Mon Mar 20 13:16:20 2017
 """
 import numpy as np
 from scipy import signal
-from DenseOpticalFlow import AbstractDenseOpticalFlow
+from src.motion_analysis.DenseOpticalFlow import AbstractDenseOpticalFlow
 from timeit import default_timer as timer
+from tqdm import tqdm
 
 class HornShunck(AbstractDenseOpticalFlow):
     """
@@ -59,7 +60,6 @@ class HornShunck(AbstractDenseOpticalFlow):
     def get_optical_flow_ROI(self, min_corner, max_corner, t, initial_displacements = None, max_iterations = 10000,
                              smoothness = 0.1, input_mask = None):
         
-        
         #get corners coordinates
         x_min, y_min = min_corner
         x_max, y_max = max_corner
@@ -105,7 +105,7 @@ class HornShunck(AbstractDenseOpticalFlow):
         
         start = timer()
         
-        for each in range(max_iterations):
+        for each in tqdm(range(max_iterations)):
             #get update the displacements based on the previous displacements
             current_displacements = self._update_displacements(previous_displacements, a, b, c)
             current_displacements = np.multiply(anti_mask, current_displacements) + weighted_initial_displacements
