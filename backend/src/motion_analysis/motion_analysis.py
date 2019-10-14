@@ -28,7 +28,7 @@ def get_displacements_frame_to_frame(cumulative_displacements):
 #action functions
 def generate_data(args):
     args["image"].sort()
-    images = [MyImage(image) for image in args["image"]]
+    images = [MyImage(image, compress_image=args["fullImage"]) for image in args["image"]]
     video = MyVideo(images)
 
     min_corner = tuple(args["c"][:2])
@@ -272,6 +272,7 @@ HELP = {"image": "8 file paths of the images to be analysed. After sorting them 
         "--a8": "save 7 png files in which the i-th file (i from 0 to 6) consists of a vector field representing the optical flow from frame i to frame i+1. "+\
                 "The i-th file is named #displacements_vector_field_i.png, where # is the positional argument root. The parameters k and scale work as described in flag -a",
         "--hornShunck": "run Horn and Shunck algorithm if specified",
+        "--fullImage": "run algoritm in full image. If not set, compress image",
         "--motionmag": "store 8 images resulting from the motion magnification of the original 8 frames. The input factor determines " + \
                        "the factor by which the displacements will be multiplied. The name of the file of the i-th frame (with i between 0 and 7) will be #motion_mag_factorF_i.bmp, where # is the " + \
                        "positional argument root and F is the float of the input factor.",
@@ -293,6 +294,7 @@ if __name__ == "__main__":
              {"-x": dict(action="store_true", help=HELP["-x"])},
              {"-w": dict(action="store", help=HELP["-w"], nargs=6, metavar=("frequency", "pixel_dimensions", "x_min", "y_min", "x_max", "y_max"), type=float)},
              {"--hornShunck": dict(action="store_true", help=HELP["--hornShunck"])},
+             {"--fullImage": dict(action="store_false", help=HELP["--fullImage"])},
              {"--motionmag": dict(action="store", help=HELP["--motionmag"], type=float, metavar="factor")},
              {"--motionstop": dict(action="store_true", help=HELP["--motionstop"])}]
 

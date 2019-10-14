@@ -2,12 +2,18 @@ from PIL import Image as Img
 import numpy as np
 from scipy.interpolate import griddata
 
+from  numba import njit
+
 
 import mmap
 import contextlib
 import re
 import struct
 import datetime
+
+import pickle
+
+from src.utils.compress_matrix import compress_matrix
 
 class MyImage(object):
     """
@@ -36,7 +42,7 @@ class MyImage(object):
     
     """
     
-    def __init__(self, file_path):
+    def __init__(self, file_path, compress_image=False):
         """
         Creates an MyImage object from the file path of the image we want to represent
         params:
@@ -113,34 +119,36 @@ class MyImage(object):
                 
                 ################## Save the image as nD
                 #test our python nD writing powers
-                writefile=file_path + ".new"
-                with open(writefile, 'bw') as w:                   
-                    prefix = b'# 2D F32 ' + str(width).encode() + b' ' + str(height).encode() + b'\n=date=' + datetime.datetime.now().strftime("%Y-%m-%d").encode()
-                    prefix += b'\n=time=' +  datetime.datetime.now().strftime("%H:%M:%S").encode() + b'\n=command=\n' #could add commandline w/ params here before \n
+                # writefile=file_path + ".new"
+                # with open(writefile, 'bw') as w:                   
+                #     prefix = b'# 2D F32 ' + str(width).encode() + b' ' + str(height).encode() + b'\n=date=' + datetime.datetime.now().strftime("%Y-%m-%d").encode()
+                #     prefix += b'\n=time=' +  datetime.datetime.now().strftime("%H:%M:%S").encode() + b'\n=command=\n' #could add commandline w/ params here before \n
                     
-                    nprefix = len(prefix)
-                    dataoffset = nprefix
-                    datasize = 4*width*height
-                    notesoffset = dataoffset+datasize
-                    notes=b'This file was created with motion analysis'
-                    header = b'nD ' + str(dataoffset).encode() + b' ' + str(notesoffset).encode() + b'\n'
-                    while dataoffset != len(header) + nprefix:
-                        dataoffset = len(header) + nprefix
-                        notesoffset = dataoffset + datasize
-                        header = b'nD ' + str(dataoffset).encode() + b' ' + str(notesoffset).encode() + b'\n'
+                #     nprefix = len(prefix)
+                #     dataoffset = nprefix
+                #     datasize = 4*width*height
+                #     notesoffset = dataoffset+datasize
+                #     notes=b'This file was created with motion analysis'
+                #     header = b'nD ' + str(dataoffset).encode() + b' ' + str(notesoffset).encode() + b'\n'
+                #     while dataoffset != len(header) + nprefix:
+                #         dataoffset = len(header) + nprefix
+                #         notesoffset = dataoffset + datasize
+                #         header = b'nD ' + str(dataoffset).encode() + b' ' + str(notesoffset).encode() + b'\n'
 
                     
-                    w.write(header + prefix)
-                    for j in range(0, height):
-                        for i in range(0, width):
-                            w.write(struct.pack('f', self.__pixels[i][j]))
-                    w.write(notes)
-                    print("Wrote nD image to ", writefile)
+                #     w.write(header + prefix)
+                #     for j in range(0, height):
+                #         for i in range(0, width):
+                #             w.write(struct.pack('f', self.__pixels[i][j]))
+                #     w.write(notes)
+                #     print("Wrote nD image to ", writefile)
                 ###################################
                 
                                 
             m.close()
-   
+        if compress_image:
+            print ("compressing image")
+            self.__pixels = compress_matrix(self.__pixels, scale=4)
     
     #define width property
     def _width(self):
@@ -344,7 +352,6 @@ class MyImage(object):
         
         raise TypeError("invalid mode")
 
-
     def _linear_shift_image(self, u, v, file_path):
         shifted_pixels = np.zeros((self.width * self.height, 2))
         
@@ -445,12 +452,22 @@ class MyImage(object):
         noisy_pixel = max(noisy_pixel, 0)
         
         return int(round(noisy_pixel))
+    
+    def show_image(self):
+        pil_image = Img.fromarray(self.__pixels.T)
+        pil_image.show()
             
 
     
 if __name__ == "__main__":
-    image = MyImage("motion15000.0.png")
-    image = MyImage.image_from_matrix(image[300:1350, 500:1050], "tecta_art7_0.png")
+    image = MyImage("backend/testing_samples/test_image.png")
+    compressed_image = image.compress_image(4, "backend/testing_samples/test_compress_image.png")
+    #compressed_image.show_image()
+
+    print(compressed_image.width, compressed_image.height)
+
+
+    #image = MyImage.image_from_matrix(image[300:1350, 500:1050], "tecta_art7_0.png")
     
     
 #
