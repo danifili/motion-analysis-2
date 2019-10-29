@@ -3,9 +3,13 @@ import sys
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import argparse
+import os.path
+import pickle
+
+from time import time
 
 from src.post_processing.motion_across_curve.bezier_curve import BezierCurve
-from src.utils.compute_wave_constants import decay_constant, wave_speed, unwrap_phases, fit_line
+from src.utils.compute_wave_constants import decay_constant, wave_speed, fit_line, fit_phases
 from src.utils.file_reader import read_csv_file, dict_to_json, write_csv_file
 
 #functions for computing amp and phases throughout the curve
@@ -27,18 +31,35 @@ def get_radial_amp_and_phase(long_vec, amp_vec, phase_vec):
 
   return np.array([new_amp_x, new_amp_y]), np.array([new_phase_x, new_phase_y])
 
-def get_long_radial_from_XY(start_point, end_point, control_point, ampX, ampY, phaseX, phaseY):
+def get_long_radial_from_XY(start_point, end_point, control_point, ampX, ampY, phaseX, phaseY, cacheLoc=None):
   assert ampX.shape == ampY.shape == phaseX.shape == phaseY.shape
 
   width, height = ampX.shape
 
-  bezier_curve = BezierCurve(
-    start_point = start_point * np.array([width/100, height/100]),
-    control_point = control_point * np.array([width/100, height/100]),
-    end_point = end_point * np.array([width/100, height/100])
-  )
+  real_start_point = start_point * np.array([width/100, height/100])
+  real_control_point = control_point * np.array([width/100, height/100])
+  real_end_point = end_point * np.array([width/100, height/100])
 
-  points = bezier_curve.split_curve_equally(curve_segment_length=1)
+  points = []
+  if cacheLoc is not None and os.path.isfile(cacheLoc):
+    with open(cacheLoc, "rb") as f:
+      cache_start, cache_end, cache_control, cache_points = pickle.load(f)
+      if np.array_equal(cache_start, real_start_point) and np.array_equal(cache_end, real_end_point) and np.array_equal(cache_control, real_control_point):
+        points = cache_points
+
+  if len(points) == 0:
+    bezier_curve = BezierCurve(
+      start_point = real_start_point,
+      control_point = real_control_point,
+      end_point = real_end_point
+    )
+
+    points = bezier_curve.split_curve_equally(curve_segment_length=1)
+
+    if cacheLoc is not None:
+      data = [real_start_point, real_end_point, real_control_point, points]
+      with open(cacheLoc, "wb") as f:
+        pickle.dump(data, f)
 
   print("divided bezier curve")
 
@@ -77,7 +98,6 @@ def generate_data(args, state):
   phaseY = read_csv_file(args["phaseY"])
 
   print ("read csv files")
-
   long_amps, radial_amps, long_phases, radial_phases = get_long_radial_from_XY(
     start_point=start_point,
     end_point=end_point,
@@ -85,7 +105,8 @@ def generate_data(args, state):
     ampX=ampX,
     ampY=ampY,
     phaseX=phaseX,
-    phaseY=phaseY
+    phaseY=phaseY,
+    cacheLoc = "./backend/cache.pkl" if args["cache"] else None
   )
 
   state["ampLong"] = long_amps
@@ -94,16 +115,23 @@ def generate_data(args, state):
   state["phaseRadial"] = radial_phases
 
 def standard_out(args, state):
-  decay_long = decay_constant(state["ampLong"], args["pixel_size"])
-  decay_radial = decay_constant(state["ampRadial"], args["pixel_size"])
-  speed_long = wave_speed(state["phaseLong"], args["pixel_size"], args["frequency"])
-  speed_radial = wave_speed(state["phaseRadial"], args["pixel_size"], args["frequency"])
+  weights_long = np.log(state["ampLong"]) - np.log(state["ampLong"]).min()
+  weights_radial = np.log(state["ampRadial"]) - np.log(state["ampRadial"]).min()
+
+  decay_long, snr_decay_long = decay_constant(state["ampLong"], args["pixel_size"])
+  decay_radial, snr_decay_radial = decay_constant(state["ampRadial"], args["pixel_size"])
+  speed_long, snr_speed_long = wave_speed(state["phaseLong"], args["pixel_size"], args["frequency"], weights_long)
+  speed_radial, snr_speed_radial = wave_speed(state["phaseRadial"], args["pixel_size"], args["frequency"], weights_radial)
 
   json_out = {
     "decayLong": decay_long,
+    "SNRdecayLong": snr_decay_long,
     "decayRadial": decay_radial,
+    "SNRdecayRadial": snr_decay_radial,
     "speedLong": speed_long,
-    "speedRadial": speed_radial
+    "SNRspeedLong": snr_speed_long,
+    "speedRadial": speed_radial,
+    "SNRspeedRadial": snr_speed_radial
   }
 
   dict_to_json(json_out, args["root"] + "wave_results.json")
@@ -121,27 +149,41 @@ def save_plot_if_included(args, suffix):
     if args["savePlots"]:
       plt.savefig(args["root"] + suffix)
 
+def plot_phases(phases, amps):
+  log_amps = np.log(amps)
+  slope, offset = fit_phases(phases, log_amps - np.min(log_amps))
+  phases_fit = slope * np.arange(len(phases)) + offset
+  phases_fit %= 2*np.pi
+  phases_fit[phases_fit < 0] += 2*np.pi
+
+  plt.plot(phases)
+  plt.plot(phases_fit)
+  plt.ylim([0,2*np.pi])
+
+def plot_amplitudes(amps):
+  slope, offset = fit_line(np.log(amps))
+  log_amps_fit = slope * np.arange(len(np.log(amps))) + offset
+
+  plt.plot(np.log(amps))
+  plt.plot(log_amps_fit)
+
 def plots_handler(args, state):
   
   if args["showPlots"] or args["savePlots"]:
     plt.figure("Long Amp")
-    plt.plot(np.log(state["ampLong"]))
-    plt.plot(fit_line(np.log(state["ampLong"])))
+    plot_amplitudes(state["ampLong"])
     save_plot_if_included(args, "amplitudes_long.png")
 
-    plt.figure("Long Phase")
-    plt.plot(state["phaseLong"])
-    plt.plot(fit_line(unwrap_phases(state["phaseLong"])))
-    save_plot_if_included(args, "phases_long.png")
-
     plt.figure("Radial Amp")
-    plt.plot(np.log(state["ampRadial"]))
-    plt.plot(fit_line(np.log(state["ampRadial"])))
+    plot_amplitudes(state["ampRadial"])
     save_plot_if_included(args, "amplitudes_radial.png")
 
+    plt.figure("Long Phase")
+    plot_phases(state["phaseLong"], state["ampLong"])
+    save_plot_if_included(args, "phases_long.png")
+
     plt.figure("Radial Phase")
-    plt.plot(state["phaseRadial"])
-    plt.plot(fit_line(unwrap_phases(state["phaseRadial"])))
+    plot_phases(state["phaseRadial"], state["ampRadial"])
     save_plot_if_included(args, "phases_radial.png")
 
 
@@ -183,7 +225,8 @@ if __name__ == "__main__":
     {"phaseY": dict(action="store", help=HELP["phaseY"], type=str)},
     {"--exportCSV": dict(action="store_true", help=HELP["--exportCSV"])},
     {"--savePlots": dict(action="store_true", help=HELP["--savePlots"])},
-    {"--showPlots": dict(action="store_true", help=HELP["--showPlots"])}
+    {"--showPlots": dict(action="store_true", help=HELP["--showPlots"])},
+    {"--cache": dict(action="store_true")}
   ]
 
   functions = [generate_data, standard_out, exportCSV_handler, plots_handler]

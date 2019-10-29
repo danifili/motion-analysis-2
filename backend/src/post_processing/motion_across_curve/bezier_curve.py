@@ -19,9 +19,10 @@ class BezierCurve:
     chuncks is determined by the [curve_segment_length] param
     """
     curve_length = self.estimate_curve_length()
-    num_steps = int(self.estimate_curve_length() / curve_segment_length)
-    return np.array([self.get_parametrized_point(self.find_parameter_t(curve_length * step/num_steps)) for step in range(num_steps)])
-  
+    num_steps = int(curve_length / curve_segment_length)
+    out = np.array([self.get_parametrized_point(self.find_parameter_t(curve_length * step/num_steps)) for step in range(num_steps)])
+    return out
+    
   def estimate_curve_length(self, start_t=0, end_t=1, num_steps=100):
     """
     Estimates sub-curve's length from P([start_t]) to P([end_t]) by taking [num_steps] points in the sub curve
