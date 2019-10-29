@@ -61,14 +61,12 @@ def get_long_radial_from_XY(start_point, end_point, control_point, ampX, ampY, p
       with open(cacheLoc, "wb") as f:
         pickle.dump(data, f)
 
-  print("divided bezier curve")
-
   long_amps = []
   long_phases = []
   radial_amps = []
   radial_phases = []
 
-  for i in tqdm(range(len(points)-1)):
+  for i in range(len(points)-1):
     point = points[i]
     next_point = points[i+1]
     discrete_x, discrete_y = int(round(point[0])), int(round(point[1]))
@@ -97,7 +95,6 @@ def generate_data(args, state):
   phaseX = read_csv_file(args["phaseX"])
   phaseY = read_csv_file(args["phaseY"])
 
-  print ("read csv files")
   long_amps, radial_amps, long_phases, radial_phases = get_long_radial_from_XY(
     start_point=start_point,
     end_point=end_point,
@@ -125,13 +122,9 @@ def standard_out(args, state):
 
   json_out = {
     "decayLong": decay_long,
-    "SNRdecayLong": snr_decay_long,
     "decayRadial": decay_radial,
-    "SNRdecayRadial": snr_decay_radial,
     "speedLong": speed_long,
-    "SNRspeedLong": snr_speed_long,
     "speedRadial": speed_radial,
-    "SNRspeedRadial": snr_speed_radial
   }
 
   dict_to_json(json_out, args["root"] + "wave_results.json")
@@ -156,16 +149,24 @@ def plot_phases(phases, amps):
   phases_fit %= 2*np.pi
   phases_fit[phases_fit < 0] += 2*np.pi
 
-  plt.plot(phases)
-  plt.plot(phases_fit)
+  plt.xlabel("Pixels")
+  plt.ylabel("Phase")
+
+  plt.plot(phases, label="Original")
+  plt.plot(phases_fit, label="Best Linear Fit")
   plt.ylim([0,2*np.pi])
+  plt.legend()
 
 def plot_amplitudes(amps):
   slope, offset = fit_line(np.log(amps))
   log_amps_fit = slope * np.arange(len(np.log(amps))) + offset
 
-  plt.plot(np.log(amps))
-  plt.plot(log_amps_fit)
+  plt.xlabel("Pixels")
+  plt.ylabel("Log Amplitudes in Pixels")
+
+  plt.plot(np.log(amps), label="Original")
+  plt.plot(log_amps_fit, label="Best Linear Fit")
+  plt.legend()
 
 def plots_handler(args, state):
   

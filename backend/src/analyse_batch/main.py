@@ -1,10 +1,17 @@
 import sys
 import argparse
 import os
-import subprocess
+from tqdm import tqdm
 
-from src.post_processing.motion_across_curve.bezier_curve import BezierCurve
 
+def check_file_exists(filename):
+  if not os.path.isfile(filename):
+    raise RuntimeError(filename + " does not exists")
+
+def check_dir_exists(root):
+  directory = os.path.dirname(root)
+  if not os.path.exists(directory):
+    raise RuntimeError(directory + " does not exists")
 
 #classes that wrap logic when parsing line in input_file
 class MotionAnalysisInput:
@@ -12,6 +19,10 @@ class MotionAnalysisInput:
     self.images = words[:8]
     self.frequency = int(words[8])
     self.out_root = str(words[9])
+    #checking existance
+    for image in self.images:
+      check_file_exists(image)
+    check_dir_exists(self.out_root)
   
   def get_script_params(self, args, state):
     flags = []
@@ -20,10 +31,10 @@ class MotionAnalysisInput:
     flags.append(self.out_root)
     
     #standard flags
-    flags.append("-q 0 -x -p")
+    flags.append("-q 0 -x -p --fullImage")
     
     #optional flags
-    if args["fullAmpPhasePlot"]:
+    if not args["fullAmpPhasePlot"]:
       flags.append("-s")
     if not args["fasterAlgorithm"]:
       flags.append("--hornShunck")
@@ -39,7 +50,7 @@ class MotionAnalysisInput:
     words.append(self.out_root + "phases_y.csv")
     words.append(self.frequency)
     words.append(self.out_root)
-    return words
+    return CurvePostAnalysisInput(words)
 
 class CurvePostAnalysisInput:
   def __init__(self, words):
@@ -49,6 +60,10 @@ class CurvePostAnalysisInput:
     self.phaseY = words[3]
     self.frequency = int(words[4])
     self.out_root = words[5]
+    #check existance
+    for filename in (self.ampX, self.ampY, self.phaseX, self.phaseY):
+      check_file_exists(filename)
+    check_dir_exists(self.out_root)
   
   def get_script_params(self, args, state):
     flags = []
@@ -105,16 +120,17 @@ def extract_metadata(args, state):
 
 def analyse_motion(args, state):
   command_prefix = "bash ./scripts/run.sh backend/src/motion_analysis/motion_analysis.py"
+  print ("computing overall motion")
   #run processes in parallel
-  for inp in state["motion_analysis_input"]:
-    os.system(subprocess.Popen("{} {}".format(command_prefix, inp.get_script_params(args, state))))
+  for inp in tqdm(state["motion_analysis_input"]):
+    os.system("{} {}".format(command_prefix, inp.get_script_params(args, state)))
   
 
 def motion_through_curve(args, state):
   command_prefix = "bash ./scripts/run.sh backend/src/post_processing/motion_across_curve/main.py"
-
+  print ("compute motion through curve")
   #run processes in parallel
-  for inp in state["curve_post_analysis_input"]:
+  for inp in tqdm(state["curve_post_analysis_input"]):
     os.system("{} {}".format(command_prefix, inp.get_script_params(args, state)))
 
 if __name__ == "__main__":
