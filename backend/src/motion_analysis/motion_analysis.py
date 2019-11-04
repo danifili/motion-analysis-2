@@ -68,6 +68,9 @@ def save_data(args):
     for i in range(4):
         np.savetxt(root + wildcards[i] + ".csv", data[:, :, i], delimiter=",")
 
+def get_pixels(video):
+    return video[0:video.width, 0:video.height, 0]
+
 def plot_data(args):
     root = args["root"]
     video = args["video"]
@@ -98,24 +101,24 @@ def plot_data(args):
     if arrows_plot:
         amplitudes = plt.figure()
         k, scale = args["a"]
-        Plot.plot(video, data[:,:,:2], min_corner, max_corner, 0, k=int(k), scale=1/scale, color='red')
+        Plot.plot(get_pixels(video), data[:,:,:2], min_corner, max_corner, k=int(k), scale=1/scale, color='red')
     
     else:
         amplitudes_x_fig = plt.figure('Amplitudes X')
         plt.title('Amplitudes X')
-        Plot.scalar_heat_map(video, min_corner, max_corner, 0, amplitudes_x, alpha=0.3)
+        Plot.scalar_heat_map(get_pixels(video), min_corner, max_corner, amplitudes_x, alpha=0.3)
 
         amplitudes_y_fig = plt.figure('Amplitudes Y')
         plt.title('Amplitudes Y')
-        Plot.scalar_heat_map(video, min_corner, max_corner, 0, amplitudes_y, alpha=0.3)
+        Plot.scalar_heat_map(get_pixels(video), min_corner, max_corner, amplitudes_y, alpha=0.3)
 
         phases_x_fig = plt.figure('Phases X')
         plt.title('Phases X')
-        Plot.phase_heat_map(video, min_corner, max_corner, 0, phases_x, alpha=0.3)
+        Plot.phase_heat_map(get_pixels(video), min_corner, max_corner, phases_x, alpha=0.3)
 
         phases_y_fig = plt.figure('Phases Y')
         plt.title('Phases Y')
-        Plot.phase_heat_map(video, min_corner, max_corner, 0, phases_y, alpha=0.3)
+        Plot.phase_heat_map(get_pixels(video), min_corner, max_corner, phases_y, alpha=0.3)
 
     if wave:
         wave_data = args["wave_data"]

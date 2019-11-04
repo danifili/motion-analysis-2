@@ -15,12 +15,12 @@ import numpy as np
 class Plot(object):
     
     @staticmethod
-    def plot(video, displacements, min_corner, max_corner, time, k = 5, scale = 0.1, color = 'black'):
+    def plot(image, displacements, min_corner, max_corner, k = 5, scale = 0.1, color = 'black'):
         """
         Plots the optical flow of a region of interest as a vector field
         
         params:
-            -video: a MyVideo object
+            -image: a MyImage object
             
             -displacements: A 3-dimensional numpy array of floats containing the displacements
             of a certain region of interest, in which the value at (x, y, 0) represents the sdisplacement 
@@ -38,8 +38,6 @@ class Plot(object):
                 * min_corner[0] < max_corner[0] < self.width-1
                 * min_corner[1] < max_corner[1] < self.height-1
             
-            -time: the the displacements are being calculated
-            
             -scale: A float indicating the scale used to plot the vector field. For instance,
             if plot=True and scale=0.1, the arrows will be 10 times bigger.
             
@@ -55,7 +53,7 @@ class Plot(object):
         x_max, y_max = max_corner
         
         roi_width, roi_height = displacements.shape[:2]
-        plt.imshow(video[x_min:x_max+1, y_min:y_max+1, time].T, cmap='gray',vmin=0,vmax=255)
+        plt.imshow(image[x_min:x_max+1, y_min:y_max+1].T, cmap='gray',vmin=0,vmax=255)
         #get coordinates of arrows
         X, Y = [[k * x for x in range(roi_width//k)] for y in range(roi_height//k)], \
                  [[k * y for x in range(roi_width//k)] for y in range(roi_height//k)]
@@ -107,19 +105,19 @@ class Plot(object):
     
     
     @staticmethod
-    def scalar_heat_map(video, min_corner, max_corner, time, scalars, alpha=1):
-        plt.imshow(video[min_corner[0]: max_corner[0]+1, min_corner[1]:max_corner[1]+1, time].T, cmap='gray',vmin=0,vmax=255)
+    def scalar_heat_map(image, min_corner, max_corner, scalars, alpha=1):
+        plt.imshow(image[min_corner[0]: max_corner[0]+1, min_corner[1]:max_corner[1]+1].T, cmap='gray',vmin=0,vmax=255)
         plt.imshow(scalars.T, cmap='hot', interpolation='nearest', alpha=alpha)
         plt.colorbar()
     
     @staticmethod
-    def vector_heat_map(video, min_corner, max_corner, time, flow, angle, alpha=1):
+    def vector_heat_map(image, min_corner, max_corner, flow, angle, alpha=1):
         """
         Given a matrix containing the optical flow of a region of interest, it plots
         a heat map of the magnitude of the flow in a given direction
         
         params:
-            -video: a MyVideo object
+            -image: a MyImage object
             
             -min_corner: A tuple of size 2 representing the (x, y) coordinates
              of the upper-left corner of our region of interest.
@@ -132,8 +130,6 @@ class Plot(object):
             It must satisfy:
                 * min_corner[0] < max_corner[0] < self.width-1
                 * min_corner[1] < max_corner[1] < self.height-1
-            
-            -time: the the displacements are being calculated
             
             -flow:
                 A 3-dimensional numpy array of shape W x H x 2, where the (x, y, 0) and (x, y, 1)
@@ -146,7 +142,7 @@ class Plot(object):
         returns:
             None
         """
-        plt.imshow(video[min_corner[0]: max_corner[0]+1, min_corner[1]:max_corner[1]+1, time].T, cmap='gray',vmin=0,vmax=255)
+        plt.imshow(image[min_corner[0]: max_corner[0]+1, min_corner[1]:max_corner[1]+1].T, cmap='gray',vmin=0,vmax=255)
         A = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
         
         roi_width, roi_height, directions = flow.shape
@@ -157,12 +153,12 @@ class Plot(object):
         plt.colorbar()
     
     @staticmethod
-    def phase_heat_map(video, min_corner, max_corner, time, phases, alpha=1):
+    def phase_heat_map(image, min_corner, max_corner, phases, alpha=1):
         """
         Given a matrix containing phases in radians, it plots a hsv map
         
         params:
-            -video: a MyVideo object
+            -image: a MyImage object
             
             -min_corner: A tuple of size 2 representing the (x, y) coordinates
              of the upper-left corner of our region of interest.
@@ -176,15 +172,13 @@ class Plot(object):
                 * min_corner[0] < max_corner[0] < self.width-1
                 * min_corner[1] < max_corner[1] < self.height-1
             
-            -time: the the displacements are being calculated
-            
             -phases:
                 A 2-dimensional numpy array of floats
         
         returns:
             None
         """
-        plt.imshow(video[min_corner[0]: max_corner[0]+1, min_corner[1]:max_corner[1]+1, time].T, cmap='gray',vmin=0,vmax=255)
+        plt.imshow(image[min_corner[0]: max_corner[0]+1, min_corner[1]:max_corner[1]+1].T, cmap='gray',vmin=0,vmax=255)
         plt.imshow(phases.T, cmap='hsv', interpolation='nearest', alpha=alpha, vmin=0, vmax=np.pi*2)
         plt.colorbar()
         
