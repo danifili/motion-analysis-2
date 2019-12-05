@@ -28,7 +28,7 @@ def get_displacements_frame_to_frame(cumulative_displacements):
 #action functions
 def generate_data(args):
     args["image"].sort()
-    images = [MyImage(image, compress_image=args["fullImage"]) for image in args["image"]]
+    images = [MyImage(image, compress_image=not args["fullImage"]) for image in args["image"]]
     video = MyVideo(images)
 
     min_corner = tuple(args["c"][:2])
@@ -63,9 +63,9 @@ def save_data(args):
     if not save_csv:
         return
 
-    wildcards = ["amplitudes_x", "amplitudes_y", "phases_x", "phases_y"]
+    wildcards = ["amplitudes_x", "amplitudes_y", "phases_x", "phases_y", "errors_x", "errors_y"]
 
-    for i in range(4):
+    for i in range(6):
         np.savetxt(root + wildcards[i] + ".csv", data[:, :, i], delimiter=",")
 
 def get_pixels(video):
@@ -120,6 +120,14 @@ def plot_data(args):
         plt.title('Phases Y')
         Plot.phase_heat_map(get_pixels(video), min_corner, max_corner, phases_y, alpha=0.3)
 
+        error_x_fig = plt.figure('Error X')
+        plt.title('Error X')
+        Plot.scalar_heat_map(get_pixels(video), min_corner, max_corner, args["data"][:, :, 4], alpha=0.3)
+        
+        error_y_fig = plt.figure('Error Y')
+        plt.title('Error Y')
+        Plot.scalar_heat_map(get_pixels(video), min_corner, max_corner, args["data"][:, :, 5], alpha=0.3)
+
     if wave:
         wave_data = args["wave_data"]
         frequency = args["frequency"]
@@ -156,6 +164,8 @@ def plot_data(args):
             amplitudes_y_fig.savefig(root + "amplitudes_y" + ".png")
             phases_x_fig.savefig(root + "phases_x" + ".png")
             phases_y_fig.savefig(root + "phases_y" + ".png")
+            error_x_fig.savefig(root + "error_x" + ".png")
+            error_y_fig.savefig(root + "error_y" + ".png")
 
         if arrows_8:
             k8, scale8 = arrows_8
@@ -297,7 +307,7 @@ if __name__ == "__main__":
              {"-x": dict(action="store_true", help=HELP["-x"])},
              {"-w": dict(action="store", help=HELP["-w"], nargs=6, metavar=("frequency", "pixel_dimensions", "x_min", "y_min", "x_max", "y_max"), type=float)},
              {"--hornShunck": dict(action="store_true", help=HELP["--hornShunck"])},
-             {"--fullImage": dict(action="store_false", help=HELP["--fullImage"])},
+             {"--fullImage": dict(action="store_true", help=HELP["--fullImage"])},
              {"--motionmag": dict(action="store", help=HELP["--motionmag"], type=float, metavar="factor")},
              {"--motionstop": dict(action="store_true", help=HELP["--motionstop"])}]
 

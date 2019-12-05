@@ -61,7 +61,7 @@ def sinusoidal_fit(cumulative_displacements):
     width = cumulative_displacements.shape[1]
     height = cumulative_displacements.shape[2]
 
-    data = np.zeros((width, height, 4), dtype=np.float64)
+    data = np.zeros((width, height, 6), dtype=np.float64)
     single_cumulative_displacements_x = np.zeros(8, dtype=np.float64)
     single_cumulative_displacements_y = np.zeros(8, dtype=np.float64)
 
@@ -70,14 +70,15 @@ def sinusoidal_fit(cumulative_displacements):
             for f in range(period):
                 single_cumulative_displacements_x[f] = cumulative_displacements[f, x, y, 0]
                 single_cumulative_displacements_y[f] = cumulative_displacements[f, x, y, 1]
-            amp_x, phase_x = sinusoidal_fit_helper(single_cumulative_displacements_x, P)
-            amp_y, phase_y = sinusoidal_fit_helper(single_cumulative_displacements_y, P)
+            amp_x, phase_x, err_x = sinusoidal_fit_helper(single_cumulative_displacements_x, P)
+            amp_y, phase_y, err_y = sinusoidal_fit_helper(single_cumulative_displacements_y, P)
 
             data[x, y, 0] = amp_x
             data[x, y, 1] = amp_y
             data[x, y, 2] = phase_x
             data[x, y, 3] = phase_y
-
+            data[x, y, 4] = err_x
+            data[x, y, 5] = err_y
     return data
 
 @njit
@@ -99,12 +100,19 @@ def sinusoidal_fit_helper(cumulative_displacements, P):
     B = projection[1]
 
     amp = np.sqrt(A * A + B * B)
-    phase = np.arctan2(B, A)
+    phase = np.arctan2(B, A)   
 
     if phase < 0:
         phase += 2 * np.pi
+    
+    frequencies = 2*np.pi * np.arange(8) / 8
+    #signal = ((A * np.sin(frequencies) +  B * (np.cos(frequencies) - 1)) ** 2 ).sum()
+    #noise = np.sum((A * np.sin(frequencies) +  B * (np.cos(frequencies) - 1) - cumulative_displacements)**2) + 1e-6
+    #err = max(0, np.log(signal / noise))
 
-    return amp, phase % (2 * np.pi)
+    signal = A * np.sin(frequencies) +  B * (np.cos(frequencies) - 1)
+    err = np.dot(signal, cumulative_displacements) / ((np.linalg.norm(signal) * np.linalg.norm(cumulative_displacements)) + 1e-6)
+    return amp, phase % (2 * np.pi), err
 
 class MyVideo(MyVideoHelper2):
     
@@ -287,8 +295,9 @@ class MyVideo(MyVideoHelper2):
         for t in range(self.duration-1):
             new_displacements = self.get_optical_flow_ROI(min_corner, max_corner, t, win_min=win_min, win_max=win_max, quality_level=quality_level,\
                                                     max_iterations=max_iterations, smoothness=smoothness)
-
+            
             cumulative_displacements[t+1] = cumulative_displacements[t] + new_displacements
+        
 
         return cumulative_displacements
 

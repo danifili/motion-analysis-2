@@ -16,9 +16,11 @@ def check_dir_exists(root):
 #classes that wrap logic when parsing line in input_file
 class MotionAnalysisInput:
   def __init__(self, words):
+    assert len(words) in (10, 12)
     self.images = words[:8]
     self.frequency = int(words[8])
     self.out_root = str(words[9])
+    self.bounds = tuple(map(int, (words[10:12]))) if len(words) == 12 else None
     #checking existance
     for image in self.images:
       check_file_exists(image)
@@ -50,19 +52,24 @@ class MotionAnalysisInput:
     words.append(self.out_root + "phases_y.csv")
     words.append(self.frequency)
     words.append(self.out_root)
+    if self.bounds is not None:
+      words.extend(map(str, self.bounds))
     return CurvePostAnalysisInput(words)
 
 class CurvePostAnalysisInput:
   def __init__(self, words):
+    assert len(words) in (6, 8)
     self.ampX = words[0]
     self.ampY = words[1]
     self.phaseX = words[2]
     self.phaseY = words[3]
     self.frequency = int(words[4])
     self.out_root = words[5]
+    self.bounds = map(int, (words[6:8])) if len(words) == 8 else None
+
     #check existance
-    for filename in (self.ampX, self.ampY, self.phaseX, self.phaseY):
-      check_file_exists(filename)
+    # for filename in (self.ampX, self.ampY, self.phaseX, self.phaseY):
+    #   check_file_exists(filename)
     check_dir_exists(self.out_root)
   
   def get_script_params(self, args, state):
@@ -85,6 +92,9 @@ class CurvePostAnalysisInput:
       flags.append("--exportCSV")
     if args["curveAmpPhasePlot"]:
       flags.append("--savePlots")
+    if self.bounds is not None:
+      flags.append("--bounds")
+      flags.extend(map(str, self.bounds))
     
     return " ".join(flags)
 
@@ -105,15 +115,15 @@ def extract_metadata(args, state):
         assert state["pixel_size"] > 0
       else:
         try:
-          if len(words) == 10:
-            motion_inp = MotionAnalysisInput(words)
+          if words[0] == "images":
+            motion_inp = MotionAnalysisInput(words[1:])
             state["motion_analysis_input"].append(motion_inp)
             state["curve_post_analysis_input"].append(motion_inp.get_curve_post_analysis_input())
-          elif len(words) == 6:
-            post_inp = CurvePostAnalysisInput(words)
+          elif words[0] == "motion":
+            post_inp = CurvePostAnalysisInput(words[1:])
             state["curve_post_analysis_input"].append(post_inp)
           else:
-            raise RuntimeError("incorrect number of arguments line")
+            raise RuntimeError("incorrect first argument")
         except:
           raise RuntimeError("Parsing error in line: {}".format(str(line_number)))
       line_number += 1

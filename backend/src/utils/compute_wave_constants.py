@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 def _find_indices(array):
   return np.argwhere(array).T[0]
 
-def get_inliers(y):
-  first_slope, first_intercept, _, _, _ = linregress(np.arange(len(y)), y)
-  first_linear_y = first_slope * np.arange(len(y)) + first_intercept
+def get_inliers(x, y):
+  first_slope, first_intercept, _, _, _ = linregress(x, y)
+  first_linear_y = first_slope * x + first_intercept
 
   errors = np.abs(first_linear_y - y)
   std_dev = np.sqrt(np.sum(errors ** 2) / len(errors))
@@ -16,9 +16,10 @@ def get_inliers(y):
   
   return not_noisy_indices
 
-def _robust_linear_fit(y):
-  inliers = get_inliers(y)
-  final_slope, final_intercept, _, _, _ = linregress(np.arange(len(y))[inliers], y[inliers])
+def _robust_linear_fit(x, y):
+  assert x.shape == y.shape
+  inliers = get_inliers(x, y)
+  final_slope, final_intercept, _, _, _ = linregress(x[inliers], y[inliers])
   return final_slope, final_intercept
 
 def _get_weighted_average(y, weights):
@@ -34,7 +35,7 @@ def _robust_constant_fit(y, weights):
 def _get_line(y, slope, intercept):
   return np.arange(len(y)) * slope + intercept
 
-def decay_constant(amplitudes, pixel_size):
+def decay_constant(amplitudes, pixel_size, lower_bound):
   """
   Computes decay constant
 
@@ -46,7 +47,7 @@ def decay_constant(amplitudes, pixel_size):
     decay constant in 1/microns
   """
   log_amps = np.log(amplitudes)
-  slope, intercept = fit_line(log_amps)
+  slope, intercept = fit_line(log_amps, lower_bound)
   return -pixel_size / slope, \
          snr(log_amps, _get_line(log_amps, slope, intercept), np.ones(len(amplitudes)))
 
@@ -76,12 +77,15 @@ def wave_speed(phases, pixel_size, frequency, weights):
 
 def fit_phases(phases, weights):
   first_differences = compute_difference(phases)
-  mean_difference = _robust_constant_fit(first_differences, weights[:-1])
+  mean_difference = _robust_constant_fit(first_differences, weights[:-1] + 1e-6)
   slope, intercept = mean_difference, phases[0]
   return slope, intercept
 
-def fit_line(y):
-  slope, intercept = _robust_linear_fit(y)
+def fit_line(y, lower_bound):
+  xs = _find_indices(y >= lower_bound)
+  if len(xs) < len(y) / 3:
+    xs = np.arange(len(y))
+  slope, intercept = _robust_linear_fit(xs, y[xs])
   return slope, intercept
 
 def snr(noisy_signal, ideal_signal, weights):
