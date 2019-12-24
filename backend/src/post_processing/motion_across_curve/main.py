@@ -12,29 +12,18 @@ from time import time
 from src.post_processing.motion_across_curve.bezier_curve import BezierCurve
 from src.utils.compute_wave_constants import decay_constant, wave_speed, fit_line, fit_phases, _robust_constant_fit
 from src.utils.file_reader import read_csv_file, dict_to_json, write_csv_file
-
+from src.post_processing.motion_across_curve.curve_utils import clamp, get_range, get_points_from_GUI, change_basis
 
 LOWER_BOUND_LOG_AMP = -2
-
-def get_range(array, bounds):
-  if bounds is None:
-    return array
-  min_x, max_x = bounds
-  assert 0 <= min_x < len(array)
-  assert 0 <= min_x < max_x <= len(array)
-  return array[min_x: max_x]
 
 @njit
 #functions for computing amp and phases throughout the curve
 def get_radial_amp_and_phase(long_vec, amp_vec, phase_vec):
-  theta = np.arctan2(long_vec[1], long_vec[0])
   Ax, Bx = amp_vec[0] * np.cos(phase_vec[0]), amp_vec[0] * np.sin(phase_vec[0])
   Ay, By = amp_vec[1] * np.cos(phase_vec[1]), amp_vec[1] * np.sin(phase_vec[1])
   
-  new_Ax = Ax * np.cos(theta) + Ay * np.sin(theta)
-  new_Bx = Bx * np.cos(theta) + By * np.sin(theta)
-  new_Ay = -Ax * np.sin(theta) + Ay * np.cos(theta)
-  new_By = -Bx * np.sin(theta) + By * np.cos(theta)
+  new_Ax, new_Ay = change_basis(long_vec, Ax, Ay)
+  new_Bx, new_By = change_basis(long_vec, Bx, By)
 
   new_amp_x = np.sqrt(new_Ax ** 2 + new_Bx ** 2)
   new_amp_y = np.sqrt(new_Ay ** 2 + new_By ** 2)
@@ -61,13 +50,6 @@ def average_phase(phases, weights):
     out += 2*np.pi
   return out
 
-def clamp(x, lower, upper):
-  if x < lower:
-    return lower
-  if x > upper:
-    return upper
-  return x
-
 def get_long_radial_from_XY(start_point, end_point, control_point, ampX, ampY, phaseX, phaseY, cacheLoc=None, translation=1):
   assert ampX.shape == ampY.shape == phaseX.shape == phaseY.shape
 
@@ -77,26 +59,14 @@ def get_long_radial_from_XY(start_point, end_point, control_point, ampX, ampY, p
   real_control_point = control_point * np.array([width/100, height/100])
   real_end_point = end_point * np.array([width/100, height/100])
 
-  points = []
-  if cacheLoc is not None and os.path.isfile(cacheLoc):
-    with open(cacheLoc, "rb") as f:
-      cache_start, cache_end, cache_control, cache_points = pickle.load(f)
-      if np.array_equal(cache_start, real_start_point) and np.array_equal(cache_end, real_end_point) and np.array_equal(cache_control, real_control_point):
-        points = cache_points
-
-  if len(points) == 0:
-    bezier_curve = BezierCurve(
-      start_point = real_start_point,
-      control_point = real_control_point,
-      end_point = real_end_point
-    )
-
-    points = bezier_curve.split_curve_equally(curve_segment_length=1)
-
-    if cacheLoc is not None:
-      data = [real_start_point, real_end_point, real_control_point, points]
-      with open(cacheLoc, "wb") as f:
-        pickle.dump(data, f)
+  points = get_points_from_GUI(
+    start_point=start_point,
+    control_point=control_point,
+    end_point=end_point,
+    width=width,
+    height=height,
+    cacheLoc=cacheLoc
+  )
   
   long_amps = np.zeros((len(points)-1, translation))
   long_phases = np.zeros((len(points)-1, translation))

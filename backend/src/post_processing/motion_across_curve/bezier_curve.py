@@ -1,5 +1,6 @@
 import numpy as np
-
+import os
+import pickle
 class BezierCurve:
   """
   2D-Quadratic bezier curve determined by three points.
@@ -23,6 +24,30 @@ class BezierCurve:
     out = np.array([self.get_parametrized_point(self.find_parameter_t(curve_length * step/num_steps)) for step in range(num_steps)])
     return out
     
+  def split_curve_equally_with_cache(self, curve_segment_length, cacheLoc):
+    points = []
+    #load if cache file is present
+    if os.path.isfile(cacheLoc):
+      with open(cacheLoc, "rb") as f:
+        try:
+          cache_start, cache_end, cache_control, cache_curve_segment_length, cache_points = pickle.load(f)
+          #only load if inputs are the same
+          if np.array_equal(cache_start, self.start_point) and np.array_equal(cache_end, self.end_point) and np.array_equal(cache_control, self.control_point) and cache_curve_segment_length == curve_segment_length:
+            points = cache_points
+        except:
+          points = []
+    
+    #if there were issues loading points, run actual computation
+    if points == []:
+      points = self.split_curve_equally(curve_segment_length)
+
+    #cache result
+    data = [self.start_point, self.end_point, self.control_point, curve_segment_length, points]
+    with open(cacheLoc, "wb") as f:
+      pickle.dump(data, f)
+    
+    return points
+
   def estimate_curve_length(self, start_t=0, end_t=1, num_steps=100):
     """
     Estimates sub-curve's length from P([start_t]) to P([end_t]) by taking [num_steps] points in the sub curve

@@ -63,10 +63,22 @@ def save_data(args):
     if not save_csv:
         return
 
-    wildcards = ["amplitudes_x", "amplitudes_y", "phases_x", "phases_y", "errors_x", "errors_y"]
+    wildcards = ["amplitudes_x", "amplitudes_y", "phases_x", "phases_y"]
 
-    for i in range(6):
+    for i in range(len(wildcards)):
         np.savetxt(root + wildcards[i] + ".csv", data[:, :, i], delimiter=",")
+
+    if args["includeErrors"]:
+        np.savetxt(root + "errors_x" + ".csv", data[:, :, 4], delimiter=",")
+        np.savetxt(root + "errors_y" + ".csv", data[:, :, 5], delimiter=",")
+    
+    if args["includeDisplacements"]:
+        displacements_frame_to_frame = get_displacements_frame_to_frame(args["cumulative_displacements"])
+        assert displacements_frame_to_frame.shape[0] == 7
+        assert displacements_frame_to_frame.shape[1:3] == data.shape[:2]
+        for i in range(7):
+            np.savetxt(root + "displacementsX" + str(i) + "to" + str(i+1) + ".csv", displacements_frame_to_frame[i, :, :, 0], delimiter=",")
+            np.savetxt(root + "displacementsY" + str(i) + "to" + str(i+1) + ".csv", displacements_frame_to_frame[i, :, :, 1], delimiter=",")
 
 def get_pixels(video):
     return video[0:video.width, 0:video.height, 0]
@@ -285,7 +297,9 @@ HELP = {"image": "8 file paths of the images to be analysed. After sorting them 
         "--a8": "save 7 png files in which the i-th file (i from 0 to 6) consists of a vector field representing the optical flow from frame i to frame i+1. "+\
                 "The i-th file is named #displacements_vector_field_i.png, where # is the positional argument root. The parameters k and scale work as described in flag -a",
         "--hornShunck": "run Horn and Shunck algorithm if specified",
-        "--fullImage": "run algoritm in full image. If not set, compress image",
+        "--fullImage": "run algoritm in full image. If not set, downsample image",
+        "--includeDisplacements": "outputs frame to frame displacements",
+        "--includeErrors": "outputs sine fitting error at each pixel",
         "--motionmag": "store 8 images resulting from the motion magnification of the original 8 frames. The input factor determines " + \
                        "the factor by which the displacements will be multiplied. The name of the file of the i-th frame (with i between 0 and 7) will be #motion_mag_factorF_i.bmp, where # is the " + \
                        "positional argument root and F is the float of the input factor.",
@@ -308,6 +322,8 @@ if __name__ == "__main__":
              {"-w": dict(action="store", help=HELP["-w"], nargs=6, metavar=("frequency", "pixel_dimensions", "x_min", "y_min", "x_max", "y_max"), type=float)},
              {"--hornShunck": dict(action="store_true", help=HELP["--hornShunck"])},
              {"--fullImage": dict(action="store_true", help=HELP["--fullImage"])},
+             {"--includeDisplacements": dict(action="store_true", help=HELP["--includeDisplacements"])},
+             {"--includeErrors": dict(action="store_true", help=HELP["--includeErrors"])},
              {"--motionmag": dict(action="store", help=HELP["--motionmag"], type=float, metavar="factor")},
              {"--motionstop": dict(action="store_true", help=HELP["--motionstop"])}]
 

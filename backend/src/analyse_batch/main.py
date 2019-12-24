@@ -1,3 +1,4 @@
+from src.post_processing.motion_across_curve.frame_to_frame_displacements import DisplacementThroughCurve
 import sys
 import argparse
 import os
@@ -40,7 +41,9 @@ class MotionAnalysisInput:
       flags.append("-s")
     if not args["fasterAlgorithm"]:
       flags.append("--hornShunck")
-    
+    if args["curveDisplacementPlot"] or args["curveDisplacementCSV"]:
+      flags.append("--includeDisplacements")
+
     return " ".join(flags)
     
 
@@ -55,6 +58,17 @@ class MotionAnalysisInput:
     if self.bounds is not None:
       words.extend(map(str, self.bounds))
     return CurvePostAnalysisInput(words)
+  
+  def get_curve_displacement_input(self):
+    words = []
+    for i in range(7):
+      words.append(self.out_root + "displacementsX" + str(i) + "to" + str(i+1) + ".csv")
+    for i in range(7):
+      words.append(self.out_root + "displacementsY" + str(i) + "to" + str(i+1) + ".csv")
+    words.append(self.out_root)
+    if self.bounds is not None:
+      words.extend(map(str, self.bounds))
+    return CurveDisplacementInput(words)
 
 class CurvePostAnalysisInput:
   def __init__(self, words):
@@ -98,13 +112,25 @@ class CurvePostAnalysisInput:
     
     return " ".join(flags)
 
+class CurveDisplacementInput:
+  def __init__(self, words):
+    assert len(words) in (15, 17)
+    self.displacementsX = words[:7]
+    self.displacementsY = words[7:14]
+    self.out_root = words[14]
+    self.bounds = None
+    if len(words) == 17:
+      self.bounds = [int(words[15]), int(words[16])]
+      assert self.bounds[0] < self.bounds[1]
 
+  
 #flag handlers
 def extract_metadata(args, state):
   with open(args["input_file"], 'r') as f:
     line_number = 0
     state["motion_analysis_input"] = []
     state["curve_post_analysis_input"] = []
+    state["curve_displacement_input"] = []
     for row in f:
       words = row.split()
       if line_number == 0:
@@ -119,9 +145,13 @@ def extract_metadata(args, state):
             motion_inp = MotionAnalysisInput(words[1:])
             state["motion_analysis_input"].append(motion_inp)
             state["curve_post_analysis_input"].append(motion_inp.get_curve_post_analysis_input())
+            state["curve_displacement_input"].append(motion_inp.get_curve_displacement_input())
           elif words[0] == "motion":
             post_inp = CurvePostAnalysisInput(words[1:])
             state["curve_post_analysis_input"].append(post_inp)
+          elif words[0] == "displacements":
+            disp_inp = CurveDisplacementInput(words[1:])
+            state["curve_displacement_input"].append(disp_inp)
           else:
             raise RuntimeError("incorrect first argument")
         except:
@@ -143,6 +173,33 @@ def motion_through_curve(args, state):
   for inp in tqdm(state["curve_post_analysis_input"]):
     os.system("{} {}".format(command_prefix, inp.get_script_params(args, state)))
 
+def displacements_through_curve(args, state):
+  for inp in tqdm(state["curve_displacement_input"]):
+    for i in range(7):
+      displacementThroughCurve = \
+        DisplacementThroughCurve(
+          start_point=state["start_point"],
+          end_point=state["end_point"],
+          control_point=state["control_point"],
+          bounds = inp.bounds
+        )
+      if args["curveDisplacementPlot"]:
+        displacementThroughCurve.plot_displacements(
+          displacementX_file=inp.displacementsX[i],
+          displacementY_file=inp.displacementsY[i],
+          out_file_long=inp.out_root + "displacementsLong" + str(i) + "to" + str(i+1) + ".png",
+          out_file_radial=inp.out_root + "displacementsRadial" + str(i) + "to" + str(i+1) + ".png",
+          cacheLoc="backend/cache.pkl"
+        )
+      if args["curveDisplacementCSV"]:
+        displacementThroughCurve.save_displacements_csv(
+          displacementX_file=inp.displacementsX[i],
+          displacementY_file=inp.displacementsY[i],
+          out_file_long=inp.out_root + "displacementsLong" + str(i) + "to" + str(i+1) + ".csv",
+          out_file_radial=inp.out_root + "displacementsRadial" + str(i) + "to" + str(i+1) + ".csv",
+          cacheLoc="backend/cache.pkl"
+        )
+
 if __name__ == "__main__":
 
   #TODO: add flags cache, downsample, motionmag and motionfactor
@@ -155,7 +212,11 @@ if __name__ == "__main__":
     "fullAmpPhasePlot": "If specified and images provided, the script will output 4 2-dimensional heat map plots: " + \
       "[amplitudes_x.png], [amplitudes_y.png], [phases_x.png] and [phases_y.png]",
     "fasterAlgorithm": "If included, it will ignore the last step for computing the displacements (The Horn and Schunk algorithm)." + \
-      "The results might have a worse quality but will take less time to compute."
+      "The results might have a worse quality but will take less time to compute.",
+    "curveDisplacementPlot": "If included, the script will output 14 plots representing the longitudinal and radial " + \
+      "displacements alongisde the selected curve",
+    "curveDisplacementCSV": "If included, the script will output 14 csv files representing the longitudinal and radial " + \
+      "displacements alongside the selected curve. The unit is in pixels."
   }
 
   flags = [
@@ -163,10 +224,12 @@ if __name__ == "__main__":
     {"--curveAmpPhaseCSV": dict(action="store_true", help=HELP["curveAmpPhaseCSV"])},
     {"--curveAmpPhasePlot": dict(action="store_true", help=HELP["curveAmpPhasePlot"])},
     {"--fullAmpPhasePlot": dict(action="store_true", help=HELP["fullAmpPhasePlot"])},
-    {"--fasterAlgorithm": dict(action="store_true", help=HELP["fasterAlgorithm"])}
+    {"--fasterAlgorithm": dict(action="store_true", help=HELP["fasterAlgorithm"])},
+    {"--curveDisplacementPlot": dict(action="store_true", help=HELP["curveDisplacementPlot"])},
+    {"--curveDisplacementCSV": dict(action="store_true", help=HELP["curveDisplacementCSV"])}
   ]
 
-  functions = [extract_metadata, analyse_motion, motion_through_curve]
+  functions = [extract_metadata, analyse_motion, motion_through_curve, displacements_through_curve]
 
   parser = argparse.ArgumentParser()
 
