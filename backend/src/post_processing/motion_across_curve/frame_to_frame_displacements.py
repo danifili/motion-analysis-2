@@ -6,11 +6,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class DisplacementThroughCurve:
-  def __init__(self, start_point, end_point, control_point, bounds):
+  def __init__(self, start_point, end_point, control_point):
     self.start_point = start_point
     self.end_point = end_point
     self.control_point = control_point
-    self.bounds = bounds
   
   def _load_displacements_through_curve(self, displacementX_file, displacementY_file, cacheLoc = None):
     displacementsX = read_csv_file(displacementX_file)
@@ -42,15 +41,12 @@ class DisplacementThroughCurve:
     return np.array(long_displacements_list), np.array(radial_displacements_list)
   
   def plot_displacements(self, displacementX_file, displacementY_file, out_file_long, out_file_radial, cacheLoc = None):
-    full_displacements_long, full_displacements_radial = \
+    displacements_long, displacements_radial = \
       self._load_displacements_through_curve(
         displacementX_file=displacementX_file,
         displacementY_file=displacementY_file,
         cacheLoc=cacheLoc
       )
-
-    displacements_long = get_range(full_displacements_long, self.bounds)
-    displacements_radial = get_range(full_displacements_radial, self.bounds)
 
     plt.figure()
 

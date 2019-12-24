@@ -66,8 +66,6 @@ class MotionAnalysisInput:
     for i in range(7):
       words.append(self.out_root + "displacementsY" + str(i) + "to" + str(i+1) + ".csv")
     words.append(self.out_root)
-    if self.bounds is not None:
-      words.extend(map(str, self.bounds))
     return CurveDisplacementInput(words)
 
 class CurvePostAnalysisInput:
@@ -114,14 +112,10 @@ class CurvePostAnalysisInput:
 
 class CurveDisplacementInput:
   def __init__(self, words):
-    assert len(words) in (15, 17)
+    assert len(words) == 15
     self.displacementsX = words[:7]
     self.displacementsY = words[7:14]
     self.out_root = words[14]
-    self.bounds = None
-    if len(words) == 17:
-      self.bounds = [int(words[15]), int(words[16])]
-      assert self.bounds[0] < self.bounds[1]
 
   
 #flag handlers
@@ -180,8 +174,7 @@ def displacements_through_curve(args, state):
         DisplacementThroughCurve(
           start_point=state["start_point"],
           end_point=state["end_point"],
-          control_point=state["control_point"],
-          bounds = inp.bounds
+          control_point=state["control_point"]
         )
       if args["curveDisplacementPlot"]:
         displacementThroughCurve.plot_displacements(
