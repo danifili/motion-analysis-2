@@ -4,7 +4,6 @@ from src.post_processing.motion_across_curve.curve_utils import *
 
 import numpy as np
 import matplotlib.pyplot as plt
-
 class DisplacementThroughCurve:
   def __init__(self, start_point, end_point, control_point):
     self.start_point = start_point
@@ -52,19 +51,20 @@ class DisplacementThroughCurve:
 
     plt.xlabel("Pixels")
     plt.ylabel("Displacement in Pixels")
-    plt.plot(displacements_long)
-    plt.hlines(0, 0, len(displacements_long)-1, linestyles="dashed")
-    plt.ylim([-1.2,1.2])
+    self._graph_plot(displacements_long)
     plt.savefig(out_file_long)
 
     plt.figure()
-
     plt.xlabel("Pixels")
     plt.ylabel("Displacement in Pixels")
-    plt.plot(displacements_radial)
-    plt.hlines(0, 0, len(displacements_radial)-1, linestyles="dashed")
-    plt.ylim([-1.2,1.2])
+    self._graph_plot(displacements_radial)
     plt.savefig(out_file_radial)
+  
+  def _graph_plot(self, y):
+    sample_size = int(0.03 * len(y)) + 1
+    plt.scatter(np.arange(0, len(y)-1, sample_size), y[::sample_size], facecolors='none', edgecolors="b")
+    plt.hlines(0, 0, len(y)-1, linestyles="dashed")
+    plt.ylim([-1.2,1.2])
 
   def save_displacements_csv(self, displacementX_file, displacementY_file, out_file_long, out_file_radial, cacheLoc = None):
     displacements_long, displacements_radial = \
