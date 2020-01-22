@@ -452,7 +452,9 @@ class MyImage(object):
         pil_image = Img.fromarray(self.__pixels.T)
         pil_image.show()
             
-
+    def get_pixels(self):
+        #deep copy field for avoiding aliasing
+        return np.array(self.__pixels)
     
 if __name__ == "__main__":
     image = MyImage("backend/testing_samples/test_image.png")

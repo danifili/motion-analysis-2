@@ -3,12 +3,14 @@ from src.post_processing.motion_across_curve.bezier_curve import BezierCurve
 from src.post_processing.motion_across_curve.curve_utils import *
 
 import numpy as np
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 class DisplacementThroughCurve:
-  def __init__(self, start_point, end_point, control_point):
+  def __init__(self, start_point, end_point, control_point, background_image):
     self.start_point = start_point
     self.end_point = end_point
     self.control_point = control_point
+    self.background_image = background_image
   
   def _load_displacements_through_curve(self, displacementX_file, displacementY_file, cacheLoc = None):
     displacementsX = read_csv_file(displacementX_file)
@@ -47,24 +49,43 @@ class DisplacementThroughCurve:
         cacheLoc=cacheLoc
       )
 
+    width, height = read_csv_file(displacementX_file).shape
+
     plt.figure()
 
     plt.xlabel("Pixels")
     plt.ylabel("Displacement in Pixels")
-    self._graph_plot(displacements_long)
-    plt.savefig(out_file_long)
+    self._graph_plot(displacements_long, width)
+    plt.savefig(out_file_long, format="eps")
 
     plt.figure()
     plt.xlabel("Pixels")
     plt.ylabel("Displacement in Pixels")
-    self._graph_plot(displacements_radial)
-    plt.savefig(out_file_radial)
-  
-  def _graph_plot(self, y):
-    sample_size = int(0.03 * len(y)) + 1
-    plt.scatter(np.arange(0, len(y)-1, sample_size), y[::sample_size], facecolors='none', edgecolors="b")
-    plt.hlines(0, 0, len(y)-1, linestyles="dashed")
-    plt.ylim([-1.2,1.2])
+    self._graph_plot(displacements_radial, width)
+    plt.savefig(out_file_radial, format="eps")
+
+  def to_plot_bounds(self, xs, image_width, curve_length):
+    return self.start_point[0] / 100 * image_width + (xs / curve_length * (self.end_point[0] - self.start_point[0]) / 100 * image_width)
+
+  def _graph_plot(self, y, image_width):
+    sample_size = int(0.03 * self.to_plot_bounds(len(y), image_width, len(y))) + 1
+    sample_xs = np.arange(0, len(y)-1, sample_size)
+    sample_ys = y[::sample_size]
+    
+    #smooth fit
+    xs = np.arange(len(y))
+    params = np.polyfit(xs, y, deg=5)
+    plt.plot(self.to_plot_bounds(xs, image_width, len(y)), sum(params[5-i] * xs ** i for i in range(6)))
+
+    #scatter plot
+    plt.scatter(self.to_plot_bounds(sample_xs, image_width, len(y)), sample_ys, facecolors='none', edgecolors="b")
+    plt.hlines(0, 0, image_width-1, linestyles="dashed")
+
+    #draw background image
+    ext = [0, image_width, -1.2, 1.2]
+    plt.imshow(self.background_image.get_pixels().T, cmap='gray',vmin=0,vmax=255, extent=ext)
+    aspect=self.background_image.height/float(self.background_image.width)*((ext[1]-ext[0])/(ext[3]-ext[2]))
+    plt.gca().set_aspect(aspect)
 
   def save_displacements_csv(self, displacementX_file, displacementY_file, out_file_long, out_file_radial, cacheLoc = None):
     displacements_long, displacements_radial = \

@@ -1,4 +1,5 @@
 from src.post_processing.motion_across_curve.frame_to_frame_displacements import DisplacementThroughCurve
+from src.motion_analysis.MyImage import MyImage
 import sys
 import argparse
 import os
@@ -65,6 +66,7 @@ class MotionAnalysisInput:
       words.append(self.out_root + "displacementsX" + str(i) + "to" + str(i+1) + ".csv")
     for i in range(7):
       words.append(self.out_root + "displacementsY" + str(i) + "to" + str(i+1) + ".csv")
+    words.append(self.images[0])
     words.append(self.out_root)
     return CurveDisplacementInput(words)
 
@@ -112,10 +114,11 @@ class CurvePostAnalysisInput:
 
 class CurveDisplacementInput:
   def __init__(self, words):
-    assert len(words) == 15
+    assert len(words) == 16
     self.displacementsX = words[:7]
     self.displacementsY = words[7:14]
-    self.out_root = words[14]
+    self.background_image = MyImage(words[14])
+    self.out_root = words[15]
 
   
 #flag handlers
@@ -174,14 +177,15 @@ def displacements_through_curve(args, state):
         DisplacementThroughCurve(
           start_point=state["start_point"],
           end_point=state["end_point"],
-          control_point=state["control_point"]
+          control_point=state["control_point"],
+          background_image=inp.background_image
         )
       if args["curveDisplacementPlot"]:
         displacementThroughCurve.plot_displacements(
           displacementX_file=inp.displacementsX[i],
           displacementY_file=inp.displacementsY[i],
-          out_file_long=inp.out_root + "displacementsLong" + str(i) + "to" + str(i+1) + ".png",
-          out_file_radial=inp.out_root + "displacementsRadial" + str(i) + "to" + str(i+1) + ".png",
+          out_file_long=inp.out_root + "displacementsLong" + str(i) + "to" + str(i+1) + ".eps",
+          out_file_radial=inp.out_root + "displacementsRadial" + str(i) + "to" + str(i+1) + ".eps",
           cacheLoc="backend/cache.pkl"
         )
       if args["curveDisplacementCSV"]:
