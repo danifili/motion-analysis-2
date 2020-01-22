@@ -178,7 +178,8 @@ def displacements_through_curve(args, state):
           start_point=state["start_point"],
           end_point=state["end_point"],
           control_point=state["control_point"],
-          background_image=inp.background_image
+          background_image=inp.background_image,
+          pixel_size=state["pixel_size"]
         )
       if args["curveDisplacementPlot"]:
         displacementThroughCurve.plot_displacements(
