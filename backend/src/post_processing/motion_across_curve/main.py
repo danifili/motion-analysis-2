@@ -1,20 +1,14 @@
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 import argparse
-import os.path
-import pickle
+
 from numba import njit
 
-from time import time
-
-from src.post_processing.motion_across_curve.bezier_curve import BezierCurve
 from src.utils.compute_wave_constants import decay_constant, wave_speed, fit_line, fit_phases, _robust_constant_fit
 from src.utils.file_reader import read_csv_file, dict_to_json, write_csv_file
-from src.post_processing.motion_across_curve.curve_utils import clamp, get_range, get_points_from_GUI, change_basis
+from src.post_processing.motion_across_curve.curve_utils import clamp, get_range, get_points_from_GUI, change_basis, LOWER_BOUND_LOG_AMP, compute_phase_weights
 
-LOWER_BOUND_LOG_AMP = -2
 
 @njit
 #functions for computing amp and phases throughout the curve
@@ -124,16 +118,11 @@ def generate_data(args, state):
   state["phaseRadial"] = radial_phases
 
 def standard_out(args, state):
-  weights_long = np.log(get_range(state["ampLong"], args["bounds"])) - LOWER_BOUND_LOG_AMP
-  weights_long[weights_long < 0] = 0
-
-  weights_radial = np.log(get_range(state["ampRadial"], args["bounds"])) - LOWER_BOUND_LOG_AMP
-  weights_radial[weights_radial < 0] = 0
 
   decay_long, snr_decay_long = decay_constant(get_range(state["ampLong"], args["bounds"]), args["pixel_size"], LOWER_BOUND_LOG_AMP)
   decay_radial, snr_decay_radial = decay_constant(get_range(state["ampRadial"], args["bounds"]), args["pixel_size"], LOWER_BOUND_LOG_AMP)
-  speed_long, snr_speed_long = wave_speed(get_range(state["phaseLong"], args["bounds"]), args["pixel_size"], args["frequency"], weights_long)
-  speed_radial, snr_speed_radial = wave_speed(get_range(state["phaseRadial"], args["bounds"]), args["pixel_size"], args["frequency"], weights_radial)
+  speed_long, snr_speed_long = wave_speed(get_range(state["phaseLong"], args["bounds"]), args["pixel_size"], args["frequency"], get_range(compute_phase_weights(state["ampLong"]), args["bounds"]))
+  speed_radial, snr_speed_radial = wave_speed(get_range(state["phaseRadial"], args["bounds"]), args["pixel_size"], args["frequency"], get_range(compute_phase_weights(state["ampRadial"]), args["bounds"]))
 
   json_out = {
     "decayLong": decay_long,
@@ -158,9 +147,8 @@ def save_plot_if_included(args, suffix):
       plt.savefig(args["root"] + suffix)
 
 def plot_phases(phases, amps, bounds):
-  log_amps = np.log(get_range(amps, bounds))
-  weights = log_amps - LOWER_BOUND_LOG_AMP
-  weights[weights < 0] = 0
+
+  weights = get_range(compute_phase_weights(amps), bounds)
 
   slope, offset = fit_phases(get_range(phases, bounds), weights)
   phases_fit = slope * np.arange(len(phases)) + offset

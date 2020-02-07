@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.stats import linregress
-import matplotlib.pyplot as plt
 
 def _find_indices(array):
   return np.argwhere(array).T[0]
@@ -75,11 +74,42 @@ def wave_speed(phases, pixel_size, frequency, weights):
   return abs(2*np.pi * pixel_size * frequency / slope) * 1e-6, \
         snr(signal, slope * np.ones(len(phases)-1), weights[:-1])
 
-def fit_phases(phases, weights):
+def fit_phases(phases, input_weights):
+  weights = input_weights + 1e-6
+
   first_differences = compute_difference(phases)
-  mean_difference = _robust_constant_fit(first_differences, weights[:-1] + 1e-6)
-  slope, intercept = mean_difference, phases[0]
+  mean_difference = _robust_constant_fit(first_differences, weights[:-1])
+  slope = mean_difference
+
+  xs = np.arange(len(phases))
+  (sin_intercept, cos_intercept) = weighted_least_squares(
+    A = np.array([np.cos(xs * slope), np.sin(xs * slope)]).T,
+    b = np.sin(phases),
+    weights = weights
+  )
+
+  intercept = np.arctan2(sin_intercept, cos_intercept)
   return slope, intercept
+
+def weighted_least_squares(A, b, weights):
+  first_x, _, _, _ = np.linalg.lstsq(
+    np.dot(np.diag(weights), A),
+    weights * b,
+    rcond=None
+  )
+
+  estimates = np.dot(A, first_x)
+  errors = (b - estimates)
+  std_dev = np.sqrt(_get_weighted_average(errors**2, weights))
+  inliers = _find_indices(errors <= std_dev + 1e-6)
+
+  final_x, _, _, _ = np.linalg.lstsq(
+    np.dot(np.diag(weights), A)[inliers, :],
+    (weights * b)[inliers],
+    rcond=None
+  )
+
+  return final_x
 
 def fit_line(y, lower_bound):
   xs = _find_indices(y >= lower_bound)

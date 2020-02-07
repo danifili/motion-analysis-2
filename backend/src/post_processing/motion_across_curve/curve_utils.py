@@ -3,6 +3,8 @@ from src.post_processing.motion_across_curve.bezier_curve import BezierCurve
 import numpy as np
 from numba import njit
 
+LOWER_BOUND_LOG_AMP = -2
+
 def get_range(array, bounds):
   if bounds is None:
     return array
@@ -41,4 +43,9 @@ def change_basis(reference_long_vec, vecX, vecY):
   long_vec = vecX * np.cos(theta) + vecY * np.sin(theta)
   radial_vec = -vecX * np.sin(theta) + vecY * np.cos(theta)
   return long_vec, radial_vec
+
+def compute_phase_weights(amps):
+  weights = np.log(amps) - LOWER_BOUND_LOG_AMP
+  weights[weights < 0] = 0
+  return weights + 1e-6
 

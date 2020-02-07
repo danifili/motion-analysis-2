@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 import os
 import argparse
 
-
 METAVAR_IMAGE = tuple("frame" + str(t) for t in range(8))
 #helper function
 def get_displacements_frame_to_frame(cumulative_displacements):
@@ -27,7 +26,6 @@ def get_displacements_frame_to_frame(cumulative_displacements):
 
 #action functions
 def generate_data(args):
-    args["image"].sort()
     images = [MyImage(image, compress_image=not args["fullImage"]) for image in args["image"]]
     video = MyVideo(images)
 

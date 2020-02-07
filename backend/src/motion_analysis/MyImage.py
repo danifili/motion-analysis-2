@@ -456,12 +456,19 @@ class MyImage(object):
         #deep copy field for avoiding aliasing
         return np.array(self.__pixels)
     
+    def save_image(self, out_file):
+        pil_image = Img.fromarray(self.__pixels.T.astype('uint8'))
+        pil_image.save(out_file)
+    
 if __name__ == "__main__":
-    image = MyImage("backend/testing_samples/test_image.png")
-    compressed_image = image.compress_image(4, "backend/testing_samples/test_compress_image.png")
-    #compressed_image.show_image()
+    image = MyImage("/Users/danifili/Desktop/testmag/ndfiles/motion20xw1.0x.motion.10000.hz1.000.000")
+    image.save_image("test_image_10000.png")
 
-    print(compressed_image.width, compressed_image.height)
+    # image = MyImage("backend/testing_samples/test_image.png")
+    # compressed_image = image.compress_image(4, "backend/testing_samples/test_compress_image.png")
+    # #compressed_image.show_image()
+
+    # print(compressed_image.width, compressed_image.height)
 
 
     #image = MyImage.image_from_matrix(image[300:1350, 500:1050], "tecta_art7_0.png")

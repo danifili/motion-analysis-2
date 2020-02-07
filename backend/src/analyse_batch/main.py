@@ -142,7 +142,8 @@ def extract_metadata(args, state):
             motion_inp = MotionAnalysisInput(words[1:])
             state["motion_analysis_input"].append(motion_inp)
             state["curve_post_analysis_input"].append(motion_inp.get_curve_post_analysis_input())
-            state["curve_displacement_input"].append(motion_inp.get_curve_displacement_input())
+            if args["curveDisplacementPlot"] or args["curveDisplacementCSV"]:
+              state["curve_displacement_input"].append(motion_inp.get_curve_displacement_input())
           elif words[0] == "motion":
             post_inp = CurvePostAnalysisInput(words[1:])
             state["curve_post_analysis_input"].append(post_inp)
@@ -172,30 +173,29 @@ def motion_through_curve(args, state):
 
 def displacements_through_curve(args, state):
   for inp in tqdm(state["curve_displacement_input"]):
-    for i in range(7):
-      displacementThroughCurve = \
-        DisplacementThroughCurve(
-          start_point=state["start_point"],
-          end_point=state["end_point"],
-          control_point=state["control_point"],
-          background_image=inp.background_image,
-          pixel_size=state["pixel_size"]
-        )
+    displacementThroughCurve = DisplacementThroughCurve(
+      start_point=state["start_point"],
+      end_point=state["end_point"],
+      control_point=state["control_point"],
+      background_image=inp.background_image,
+      pixel_size=state["pixel_size"],
+      displacementX_files=inp.displacementsX,
+      displacementY_files=inp.displacementsY,
+      cacheLoc="backend/cache.pkl"
+    )
+    for i in range(8):
       if args["curveDisplacementPlot"]:
         displacementThroughCurve.plot_displacements(
-          displacementX_file=inp.displacementsX[i],
-          displacementY_file=inp.displacementsY[i],
-          out_file_long=inp.out_root + "displacementsLong" + str(i) + "to" + str(i+1) + ".eps",
-          out_file_radial=inp.out_root + "displacementsRadial" + str(i) + "to" + str(i+1) + ".eps",
-          cacheLoc="backend/cache.pkl"
+          time=i,
+          out_file_long=inp.out_root + "displacementsLong" + str(i) + ".eps",
+          out_file_radial=inp.out_root + "displacementsRadial" + str(i) + ".eps",
         )
+    for i in range(7):
       if args["curveDisplacementCSV"]:
         displacementThroughCurve.save_displacements_csv(
-          displacementX_file=inp.displacementsX[i],
-          displacementY_file=inp.displacementsY[i],
+          frame_to_frame_index=i,
           out_file_long=inp.out_root + "displacementsLong" + str(i) + "to" + str(i+1) + ".csv",
           out_file_radial=inp.out_root + "displacementsRadial" + str(i) + "to" + str(i+1) + ".csv",
-          cacheLoc="backend/cache.pkl"
         )
 
 if __name__ == "__main__":
