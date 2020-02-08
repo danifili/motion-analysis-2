@@ -94,8 +94,7 @@ def fit_phases(phases, input_weights):
 def weighted_least_squares(A, b, weights):
   first_x, _, _, _ = np.linalg.lstsq(
     np.dot(np.diag(weights), A),
-    weights * b,
-    rcond=None
+    weights * b
   )
 
   estimates = np.dot(A, first_x)
@@ -105,8 +104,7 @@ def weighted_least_squares(A, b, weights):
 
   final_x, _, _, _ = np.linalg.lstsq(
     np.dot(np.diag(weights), A)[inliers, :],
-    (weights * b)[inliers],
-    rcond=None
+    (weights * b)[inliers]
   )
 
   return final_x
