@@ -179,7 +179,7 @@ class DisplacementThroughCurve:
     plt.hlines(0, 0, self.background_image.width-1, linestyles="dashed")
 
     #draw background image
-    ext = np.array([0, self.background_image.width, -4, 4])
+    ext = np.array([0, self.background_image.width, -4/3, 4/3])
     plt.imshow(self.background_image.get_pixels().T, cmap='gray',vmin=0,vmax=255, extent=self._to_micrometers(ext))
     aspect=self.background_image.height/float(self.background_image.width)*((ext[1]-ext[0])/(ext[3]-ext[2]))
     plt.gca().set_aspect(aspect)
@@ -209,8 +209,6 @@ class DisplacementThroughCurve:
     params = np.array([amp_slope_guess, amp_intercept_guess, phase_slope_guess, phase_intercept_guess])
 
     return least_squares(damped_wave, params).x
-
-
   
   
 
