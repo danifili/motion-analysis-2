@@ -31,48 +31,17 @@ def _robust_constant_fit(y, weights):
   inliers = _find_indices(errors <= std_dev + 1e-6)
   return _get_weighted_average(y[inliers], weights[inliers])
 
-def _get_line(y, slope, intercept):
-  return np.arange(len(y)) * slope + intercept
-
-def decay_constant(amplitudes, pixel_size, lower_bound):
-  """
-  Computes decay constant
-
-  Params:
-    amplitudes: in pixels
-    pixel_size: in microns
-  
-  Returns: 
-    decay constant in 1/microns
-  """
-  log_amps = np.log(amplitudes)
-  slope, intercept = fit_line(log_amps, lower_bound)
-  return -pixel_size / slope, \
-         snr(log_amps, _get_line(log_amps, slope, intercept), np.ones(len(amplitudes)))
-
 def compute_difference(phases):
   out = phases[1:] - phases[:-1]
   out %= 2*np.pi
   out[out > np.pi] -= 2*np.pi
   return out
 
-def wave_speed(phases, pixel_size, frequency, weights):
-  """
-  Computes wave speed in m/s
+def wave_speed_from_slope(slope, pixel_size, frequency):
+  return abs(2 * np.pi * pixel_size * frequency / slope) * 1e-6
 
-  Params:
-    phases: values between 0 and 2pi
-    pixel_size: in microns
-    frequency: in Hz
-    weights: weights used for fitting
-  
-  Returns:
-    positive float in m/s
-  """
-  slope, intercept = fit_phases(phases, weights)
-  signal = compute_difference(phases)
-  return abs(2*np.pi * pixel_size * frequency / slope) * 1e-6, \
-        snr(signal, slope * np.ones(len(phases)-1), weights[:-1])
+def decay_constant_from_slope(slope, pixel_size):
+  return -pixel_size / slope
 
 def fit_phases(phases, input_weights):
   weights = input_weights + 1e-6
@@ -115,11 +84,3 @@ def fit_line(y, lower_bound):
     xs = np.arange(len(y))
   slope, intercept = _robust_linear_fit(xs, y[xs])
   return slope, intercept
-
-def snr(noisy_signal, ideal_signal, weights):
-  noise = noisy_signal - ideal_signal
-
-  mean_sq_sig = (noisy_signal ** 2 * weights).sum() / weights.sum()
-  mean_sq_noise = (noise ** 2 * weights).sum() / weights.sum()
-  total = 10 * np.log10(mean_sq_sig / (mean_sq_noise + 1e-10))
-  return total

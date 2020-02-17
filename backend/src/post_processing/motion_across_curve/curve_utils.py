@@ -1,4 +1,6 @@
 from src.post_processing.motion_across_curve.bezier_curve import BezierCurve
+from src.utils.compute_wave_constants import fit_line, fit_phases
+from scipy.optimize import least_squares
 
 import numpy as np
 from numba import njit
@@ -49,3 +51,21 @@ def compute_phase_weights(amps):
   weights[weights < 0] = 0
   return weights + 1e-6
 
+def compute_amp_phase_fit(amps, phases):
+  weights = compute_phase_weights(amps)
+  def damped_wave(y):
+    amp_slope, amp_intercept, phase_slope, phase_intercept = y
+    x = np.arange(len(amps))
+    return np.concatenate(
+      [
+        np.sqrt(weights) * (amps * np.sin(phases) - np.exp(amp_intercept + amp_slope * x) * np.sin(phase_slope * x + phase_intercept)),
+        np.sqrt(weights) * (amps * np.cos(phases) - np.exp(amp_intercept + amp_slope * x) * np.cos(phase_slope * x + phase_intercept))
+      ]
+    )
+
+  amp_slope_guess, amp_intercept_guess = fit_line(np.log(amps), LOWER_BOUND_LOG_AMP)
+  phase_slope_guess, phase_intercept_guess = fit_phases(phases, weights)
+
+  params = np.array([amp_slope_guess, amp_intercept_guess, phase_slope_guess, phase_intercept_guess])
+
+  return least_squares(damped_wave, params).x

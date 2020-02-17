@@ -1,8 +1,6 @@
 from src.utils.file_reader import read_csv_file, write_csv_file
 from src.post_processing.motion_across_curve.curve_utils import *
 from src.motion_analysis.MyVideoFinal import sinusoidal_fit
-from src.utils.compute_wave_constants import fit_line, fit_phases
-from scipy.optimize import least_squares
 import numpy as np
 import matplotlib.pyplot as plt
 class DisplacementThroughCurve:
@@ -42,10 +40,10 @@ class DisplacementThroughCurve:
     self.amp_long, self.amp_radial, self.phase_long, self.phase_radial = self._compute_amp_and_phase()
 
     self.amp_long_slope, self.amp_long_intercept, self.phase_long_slope, self.phase_long_intercept = \
-      self._compute_amp_phase_fit(self.amp_long, self.phase_long)
+      compute_amp_phase_fit(self.amp_long, self.phase_long)
 
     self.amp_radial_slope, self.amp_radial_intercept, self.phase_radial_slope, self.phase_radial_intercept = \
-      self._compute_amp_phase_fit(self.amp_radial, self.phase_radial)
+      compute_amp_phase_fit(self.amp_radial, self.phase_radial)
 
   def _load_displacements_through_curve(self, displacementX_file, displacementY_file, cacheLoc = None):
     displacementsX = read_csv_file(displacementX_file)
@@ -189,26 +187,6 @@ class DisplacementThroughCurve:
     displacements_radial = self.displacements_radial[frame_to_frame_index]
     write_csv_file(displacements_long, out_file_long)
     write_csv_file(displacements_radial, out_file_radial)
-
-  @staticmethod
-  def _compute_amp_phase_fit(amps, phases):
-    weights = compute_phase_weights(amps)
-    def damped_wave(y):
-      amp_slope, amp_intercept, phase_slope, phase_intercept = y
-      x = np.arange(len(amps))
-      return np.concatenate(
-        [
-          np.sqrt(weights) * (amps * np.sin(phases) - np.exp(amp_intercept + amp_slope * x) * np.sin(phase_slope * x + phase_intercept)),
-          np.sqrt(weights) * (amps * np.cos(phases) - np.exp(amp_intercept + amp_slope * x) * np.cos(phase_slope * x + phase_intercept))
-        ]
-      )
-
-    amp_slope_guess, amp_intercept_guess = fit_line(np.log(amps), LOWER_BOUND_LOG_AMP)
-    phase_slope_guess, phase_intercept_guess = fit_phases(phases, weights)
-
-    params = np.array([amp_slope_guess, amp_intercept_guess, phase_slope_guess, phase_intercept_guess])
-
-    return least_squares(damped_wave, params).x
   
   
 
