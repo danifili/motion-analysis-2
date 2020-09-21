@@ -281,7 +281,7 @@ class MyVideo(MyVideoHelper2):
         return self.__video_optical_flow.get_optical_flow_ROI(min_corner, max_corner, t, \
                 initial_displacements = displacements, max_iterations = max_iterations, smoothness = smoothness, input_mask=mask)
     
-    def get_cumulative_displacements(self, min_corner, max_corner, win_min = 5, win_max = 25, quality_level = 0.07, max_iterations = 100,  smoothness = 100):
+    def get_cumulative_displacements(self, min_corner, max_corner, win_min = 11, win_max = 75, quality_level = 0.07, max_iterations = 100,  smoothness = 100):
         x_min, y_min = min_corner
         x_max, y_max = max_corner
         
